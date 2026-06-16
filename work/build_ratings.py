@@ -100,6 +100,7 @@ def main() -> int:
     wins = Counter()
     losses = Counter()
     age_groups: dict[int, Counter] = defaultdict(Counter)
+    last_age_group: dict[int, int] = {}
     genders_seen: dict[int, Counter] = defaultdict(Counter)
     first_date: dict[int, str] = {}
     last_date: dict[int, str] = {}
@@ -119,6 +120,7 @@ def main() -> int:
                 last_date[pid] = md
             if r["age_group"]:
                 age_groups[pid][r["age_group"]] += 1
+                last_age_group[pid] = r["age_group"]
             if r["gender"]:
                 genders_seen[pid][r["gender"]] += 1
         wins[w] += 1

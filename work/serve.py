@@ -226,12 +226,21 @@ class Handler(BaseHTTPRequestHandler):
             order_col = "pr.gender_rank"
         else:
             order_col = "pr.overall_rank"
+        ag = int(q["age_group"]) if q.get("age_group") else None
+        ag_sel = (
+            f",(SELECT count(*) FROM matches WHERE winner_id=pr.player_id AND age_group={ag} AND result_type='completed') ag_wins"
+            f",(SELECT count(*) FROM matches WHERE loser_id=pr.player_id AND age_group={ag} AND result_type='completed') ag_losses"
+        ) if ag else ""
         sql = f"""
-            SELECT pr.*, p.gender, p.city AS player_city
+            SELECT pr.*, p.gender, p.city AS player_city{ag_sel}
             FROM player_ratings pr LEFT JOIN players p ON p.player_id=pr.player_id
             WHERE {' AND '.join(where)} ORDER BY {order_col} LIMIT ? OFFSET ?
         """
         rows = rows_to_dicts(conn.execute(sql, (*params, limit, offset)).fetchall())
+        if ag:
+            for r in rows:
+                r["wins"] = r.pop("ag_wins", r["wins"])
+                r["losses"] = r.pop("ag_losses", r["losses"])
         total = conn.execute(
             f"SELECT count(*) FROM player_ratings pr LEFT JOIN players p ON p.player_id=pr.player_id WHERE {' AND '.join(where)}",
             params,

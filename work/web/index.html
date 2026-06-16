@@ -226,7 +226,11 @@
       const lim=Math.min(+(q.limit||50),500), off=+(q.offset||0);
       const ord=q.age_group?'pr.age_group_rank':(q.gender?'pr.gender_rank':'pr.overall_rank');
       const wc=w.join(' AND ');
-      const rows=Q(`SELECT pr.*,p.gender pgender,p.city player_city FROM player_ratings pr LEFT JOIN players p ON p.player_id=pr.player_id WHERE ${wc} ORDER BY ${ord} LIMIT ? OFFSET ?`,[...p,lim,off]);
+      const agSel=q.age_group
+        ? `,(SELECT count(*) FROM matches WHERE winner_id=pr.player_id AND age_group=${+q.age_group} AND result_type='completed') ag_wins,(SELECT count(*) FROM matches WHERE loser_id=pr.player_id AND age_group=${+q.age_group} AND result_type='completed') ag_losses`
+        : '';
+      const rows=Q(`SELECT pr.*,p.gender pgender,p.city player_city${agSel} FROM player_ratings pr LEFT JOIN players p ON p.player_id=pr.player_id WHERE ${wc} ORDER BY ${ord} LIMIT ? OFFSET ?`,[...p,lim,off]);
+      if(q.age_group) rows.forEach(r=>{r.wins=r.ag_wins;r.losses=r.ag_losses;});
       const total=scalar(`SELECT count(*) FROM player_ratings pr LEFT JOIN players p ON p.player_id=pr.player_id WHERE ${wc}`,p);
       return {total,limit:lim,offset:off,rankings:rows};
     },
@@ -360,7 +364,7 @@ async function home(){
   const ages=s.byAgeGroup.map(a=>`<a href="#/rankings?age_group=${a.age_group}" class="pill age" style="margin:2px">${a.age_group} Yaş · ${a.n}</a>`).join(' ');
   app().innerHTML=`
     <h1>Junior Tenis Analitik</h1>
-    <p class="sub">İ-KORT 8–12 yaş turnuva verisi · Elo reyting · head-to-head</p>
+    <p class="sub">İ-KORT 8–14 yaş turnuva verisi · Elo reyting · head-to-head</p>
     <div class="cards">
       <div class="card"><div class="v">${s.ratedPlayers.toLocaleString('tr')}</div><div class="l">Reytingli Oyuncu</div></div>
       <div class="card"><div class="v">${s.completed.toLocaleString('tr')}</div><div class="l">Skorlu Maç</div></div>
@@ -380,13 +384,14 @@ function rankTable(rows, rankField){
   if(!rows.length) return '<p class="muted">kayıt yok</p>';
   rankField=rankField||'overall_rank';
   return `<table><thead><tr>
-    <th>#</th><th>Oyuncu</th><th>Kategori</th><th>Reyting</th><th>G-M</th><th>Kulüp</th></tr></thead><tbody>
+    <th>#</th><th>Oyuncu</th><th>Doğum</th><th>Kategori</th><th>Reyting</th><th>G-M</th><th>Kulüp</th></tr></thead><tbody>
     ${rows.map(p=>{
       const rk=p[rankField]!=null?p[rankField]:p.overall_rank;
       const undef=p.losses===0&&p.wins>=10?' <span class="undef" title="namağlup">★</span>':'';
       return `<tr>
         <td class="rank ${rk<=3?'top':''}">${rk}</td>
         <td><a href="#/player/${p.player_id}">${esc(p.name)}</a>${undef}</td>
+        <td class="muted">${p.birth_year||'—'}</td>
         <td class="flex">${ageP(p.age_group)}${genderP(p.gender)}</td>
         <td class="rating">${Math.round(p.rating)}</td>
         <td>${fmtWL(p.wins,p.losses)}</td>
@@ -400,7 +405,7 @@ async function rankings(params){
   app().innerHTML=`
     <h1>Sıralama</h1>
     <div class="filters">
-      <select id="fAge"><option value="">Tüm Yaşlar</option>${[8,9,10,12].map(a=>`<option value="${a}" ${a==ag?'selected':''}>${a} Yaş</option>`).join('')}</select>
+      <select id="fAge"><option value="">Tüm Yaşlar</option>${[8,9,10,12,14].map(a=>`<option value="${a}" ${a==ag?'selected':''}>${a} Yaş</option>`).join('')}</select>
       <select id="fGen"><option value="">Tüm Cinsiyet</option><option value="Erkek" ${gn=='Erkek'?'selected':''}>Erkek</option><option value="Kadın" ${gn=='Kadın'?'selected':''}>Kadın</option></select>
     </div>
     <div id="rk" class="loading">…</div>`;
