@@ -538,6 +538,7 @@ function rankTable(rows, rankField){
 // ---------- Rankings ----------
 async function rankings(params){
   const ag=params.age_group||'', gn=params.gender||'';
+  const limit=50, page=Math.max(1,parseInt(params.page||'1')), offset=(page-1)*limit;
   app().innerHTML=`
     <h1>Sıralama</h1>
     <div class="filters">
@@ -548,10 +549,13 @@ async function rankings(params){
   const apply=()=>{const a=$('#fAge').value,g=$('#fGen').value;
     location.hash='#/rankings'+qs({age_group:a,gender:g});};
   $('#fAge').onchange=apply; $('#fGen').onchange=apply;
-  const r=await api('/rankings'+qs({age_group:ag,gender:gn,limit:100}));
+  const r=await api('/rankings'+qs({age_group:ag,gender:gn,limit,offset}));
   const rankField=ag?'age_group_rank':(gn?'gender_rank':'overall_rank');
   const label=(ag?ag+' Yaş ':'')+(gn||'')||'Genel';
-  $('#rk').outerHTML=`<div id="rk"><p class="muted" style="margin:0 0 10px">${esc(label)} · ${r.total.toLocaleString('tr')} oyuncu · min 5 maç</p>${rankTable(r.rankings,rankField)}</div>`;
+  const pages=Math.ceil(r.total/limit);
+  const mk=(p,lbl,dis)=>dis?`<span class="btn" style="opacity:.4">${lbl}</span>`:`<a class="btn" href="#/rankings${qs({age_group:ag,gender:gn,page:p})}">${lbl}</a>`;
+  const pager=pages>1?`<div class="flex" style="margin:14px 0;justify-content:center;gap:12px">${mk(page-1,'‹ Önceki',page<=1)}<span class="muted">${page} / ${pages}</span>${mk(page+1,'Sonraki ›',page>=pages)}</div>`:'';
+  $('#rk').outerHTML=`<div id="rk"><p class="muted" style="margin:0 0 10px">${esc(label)} · ${r.total.toLocaleString('tr')} oyuncu · min 5 maç</p>${rankTable(r.rankings,rankField)}${pager}</div>`;
 }
 
 // ---------- Player ----------
