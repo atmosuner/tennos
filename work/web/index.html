@@ -581,9 +581,9 @@ async function player(id){
   const formBand=recentForForm.map(m=>{
     const rt=m.resultType;
     const wo=rt==='walkover', ret=rt==='retirement', done=rt==='completed';
-    const bg=done?(m.won?'var(--win)':'var(--loss)'):'var(--panel2)';
-    const col=done?(m.won?'#fff':'#fff'):'var(--dim)';
-    const brd=(!done)?'1px solid var(--line)':'none';
+    const bg=m.won?'var(--win)':'var(--loss)';
+    const col='#fff';
+    const brd='none';
     const txt=wo?'WO':ret?'Ret':(m.won?'G':'M');
     return `<span title="${esc(m.opponentName||'')} · ${esc(m.date||'')}" style="border-radius:6px;background:${bg};border:${brd};color:${col};font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:default">${txt}</span>`;
   }).join('');
