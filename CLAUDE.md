@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Scrapes İ-KORT (ikort.com.tr) Turkish junior tennis (8–12 yaş) data, resolves player
+Scrapes İ-KORT (ikort.com.tr) Turkish junior tennis (8–14 yaş) data, resolves player
 clubs, computes Elo ratings, and serves a web app — all with **Python standard library
 only** (no third-party deps). Single source of truth is `outputs/`; `tennos.db` and the
 web app are derived views.
@@ -13,7 +13,7 @@ web app are derived views.
 
 ```bash
 python3 work/extract_tournaments.py          # pasted HTML dump -> outputs/tournaments.json
-python3 work/scrape_tournament_details.py    # -> outputs/tournament_details/{id}.json (552 tournaments, ~83k matches)
+python3 work/scrape_tournament_details.py    # -> outputs/tournament_details/{id}.json (805 tournaments, ~103k matches)
 python3 work/scrape_clubs.py                 # -> outputs/clubs.json + club_abbrev_map.json
 python3 work/resolve_clubs.py                # match "(ABBREV)" -> club via player profiles -> player_club_overrides.json
 python3 work/scrape_players.py               # player directory by birth year -> outputs/players.json (~31k players)
@@ -42,8 +42,10 @@ clubs only surface via player profiles, rosters, or the player directory. `clubs
 
 **Elo** (`build_ratings.py`): single pool (so playing up an age group is rewarded),
 chronological by match date, provisional K=40 for first 30 matches then K=20, only
-`result_type='completed'` matches. `age_group` per player is the modal age of their
-matches; rankings give both `overall_rank` and `age_group_rank`.
+`result_type='completed'` matches. `age_group` per player is the highest age group they
+have played in; rankings give `overall_rank`, `age_group_rank`, and `gender_rank`.
+When the rankings API is called with `age_group` filter, `wins`/`losses` are computed
+from matches in that age group only (not career totals).
 
 **match_id** is `md5(tournament|dayId|court|matchCode|rawText)[:16]` — deterministic, so
 rebuilds are idempotent.
@@ -55,12 +57,13 @@ vanilla JS, hash routing). Endpoints: `/api/stats`, `/api/rankings`, `/api/playe
 `/api/h2h/{a}/{b}`, `/api/common/{a}/{b}`, `/api/players`, `/api/tournaments`,
 `/api/tournament/{id}`, `/api/clubs`, `/api/search`. Opens DB read-only. Port 8001.
 
-**`index.html` works two ways from the same code.** Its `api(path)` calls go to either
-the `serve.py` backend (local dev) OR an in-browser SQLite (sql.js) — the `dbApi` block at
-the top of the page mirrors every `serve.py` endpoint as client-side SQL against
-`tennos-web.db.gz`. So the app runs fully static (GitHub Pages, no backend). Keep the two
-in sync: any endpoint change in `serve.py` must be mirrored in the `dbApi` block, and vice
-versa. `work/build_web_db.py` produces the slimmed browser DB; see `work/web/DEPLOY.md`.
+**`index.html` always uses `dbApi` (in-browser sql.js against `tennos-web.db.gz`).** The
+`serve.py` JSON API endpoints exist for direct testing (curl etc.) but the UI never hits
+them — `const api=p=>window.dbApi(p)` is hardcoded. Keep the two in sync: any endpoint
+change in `serve.py` must be mirrored in the `dbApi` block, and vice versa.
+`work/build_web_db.py` produces the slimmed browser DB; see `work/web/DEPLOY.md`.
+After data changes: run `build_web_db.py` + `gzip -9 -f work/web/tennos-web.db` to
+refresh the browser DB.
 
 Score rendering: `sets.p1/p2` follow the match's player order, not winner-first. `matches`
 stores `p1_id`/`p2_id`; `build_score` orients the score by whether the viewer is `p1_id`
