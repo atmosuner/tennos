@@ -38,6 +38,23 @@ def rows_to_dicts(rows) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+# Turkish-aware, case-insensitive search folding (works in SQLite + sql.js identically).
+_TR_FOLD = str.maketrans("ıİşŞğĞçÇöÖüÜ", "IISSGGCCOOUU")
+_FOLD_PAIRS = [("ı", "I"), ("İ", "I"), ("ş", "S"), ("Ş", "S"), ("ğ", "G"), ("Ğ", "G"),
+               ("ç", "C"), ("Ç", "C"), ("ö", "O"), ("Ö", "O"), ("ü", "U"), ("Ü", "U")]
+
+
+def fold(s: str | None) -> str:
+    return (s or "").translate(_TR_FOLD).upper()
+
+
+def foldsql(col: str) -> str:
+    expr = col
+    for a, b in _FOLD_PAIRS:
+        expr = f"REPLACE({expr},'{a}','{b}')"
+    return f"UPPER({expr})"
+
+
 def build_score(conn: sqlite3.Connection, match_id: str, player_is_first: bool) -> str:
     """Render a match score from the player's perspective (player games - opponent games)."""
     sets = conn.execute(
@@ -198,7 +215,7 @@ class Handler(BaseHTTPRequestHandler):
         if q.get("gender"):
             where.append("pr.gender=?"); params.append(q["gender"])
         if q.get("q"):
-            where.append("pr.name LIKE ?"); params.append(f"%{q['q']}%")
+            where.append(f"{foldsql('pr.name')} LIKE ?"); params.append(f"%{fold(q['q'])}%")
         min_matches = int(q.get("min_matches", 5))
         where.append("pr.matches>=?"); params.append(min_matches)
         limit = min(int(q.get("limit", 50)), 500)
@@ -352,7 +369,7 @@ class Handler(BaseHTTPRequestHandler):
     def api_players(self, conn, q):
         where, params = ["1=1"], []
         if q.get("q"):
-            where.append("p.name LIKE ?"); params.append(f"%{q['q']}%")
+            where.append(f"{foldsql('p.name')} LIKE ?"); params.append(f"%{fold(q['q'])}%")
         if q.get("gender"):
             where.append("p.gender=?"); params.append(q["gender"])
         if q.get("birth_year"):
@@ -385,7 +402,7 @@ class Handler(BaseHTTPRequestHandler):
     def api_tournaments(self, conn, q):
         where, params = ["1=1"], []
         if q.get("q"):
-            where.append("(t.name LIKE ? OR t.title LIKE ?)"); params += [f"%{q['q']}%", f"%{q['q']}%"]
+            where.append(f"({foldsql('t.name')} LIKE ? OR {foldsql('t.title')} LIKE ?)"); params += [f"%{fold(q['q'])}%", f"%{fold(q['q'])}%"]
         if q.get("city"):
             where.append("t.city=?"); params.append(q["city"])
         if q.get("year"):
@@ -458,7 +475,7 @@ class Handler(BaseHTTPRequestHandler):
     def api_clubs(self, conn, q):
         where, params = ["1=1"], []
         if q.get("q"):
-            where.append("c.name LIKE ?"); params.append(f"%{q['q']}%")
+            where.append(f"{foldsql('c.name')} LIKE ?"); params.append(f"%{fold(q['q'])}%")
         limit = min(int(q.get("limit", 100)), 600)
         sql = f"""
             SELECT c.club_id, c.name, c.city,
@@ -473,14 +490,14 @@ class Handler(BaseHTTPRequestHandler):
         term = q.get("q", "").strip()
         if len(term) < 2:
             return {"players": [], "clubs": []}
-        like = f"%{term}%"
+        like = f"%{fold(term)}%"
         players = rows_to_dicts(conn.execute(
-            """SELECT pr.player_id, pr.name, pr.age_group, pr.rating, pr.club_name
-               FROM player_ratings pr WHERE pr.name LIKE ? ORDER BY pr.rating DESC LIMIT 15""",
+            f"""SELECT pr.player_id, pr.name, pr.age_group, pr.rating, pr.club_name
+               FROM player_ratings pr WHERE {foldsql('pr.name')} LIKE ? ORDER BY pr.rating DESC LIMIT 15""",
             (like,),
         ).fetchall())
         clubs = rows_to_dicts(conn.execute(
-            "SELECT club_id, name, city FROM clubs WHERE name LIKE ? LIMIT 10", (like,)
+            f"SELECT club_id, name, city FROM clubs WHERE {foldsql('name')} LIKE ? LIMIT 10", (like,)
         ).fetchall())
         return {"players": players, "clubs": clubs}
 

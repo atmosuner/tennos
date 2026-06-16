@@ -138,6 +138,10 @@
   }
   const one=(sql,p)=>{const r=Q(sql,p);return r[0]||null;};
   const scalar=(sql,p)=>{const r=one(sql,p);return r?Object.values(r)[0]:null;};
+  // Turkish-aware case-insensitive search folding (mirrors serve.py).
+  const FOLD_PAIRS=[['ı','I'],['İ','I'],['ş','S'],['Ş','S'],['ğ','G'],['Ğ','G'],['ç','C'],['Ç','C'],['ö','O'],['Ö','O'],['ü','U'],['Ü','U']];
+  function fold(s){let r=s||'';for(const[a,b]of FOLD_PAIRS)r=r.split(a).join(b);return r.toUpperCase();}
+  function foldsql(col){let e=col;for(const[a,b]of FOLD_PAIRS)e=`REPLACE(${e},'${a}','${b}')`;return `UPPER(${e})`;}
   const nameCache={};
   function nameOf(id){ if(id==null) return null; if(!(id in nameCache)){const r=one('SELECT name FROM players WHERE player_id=?',[id]);nameCache[id]=r?r.name:('#'+id);} return nameCache[id]; }
 
@@ -189,7 +193,7 @@
       if(q.age_group){w.push('pr.age_group=?');p.push(+q.age_group);}
       if(q.club_id){w.push('pr.club_id=?');p.push(+q.club_id);}
       if(q.gender){w.push('pr.gender=?');p.push(q.gender);}
-      if(q.q){w.push('pr.name LIKE ?');p.push('%'+q.q+'%');}
+      if(q.q){w.push(foldsql('pr.name')+' LIKE ?');p.push('%'+fold(q.q)+'%');}
       const mm=q.min_matches!=null?+q.min_matches:5; w.push('pr.matches>=?');p.push(mm);
       const lim=Math.min(+(q.limit||50),500), off=+(q.offset||0);
       const ord=q.age_group?'pr.age_group_rank':(q.gender?'pr.gender_rank':'pr.overall_rank');
@@ -232,7 +236,7 @@
     },
     players(q){
       const w=['1=1'],p=[];
-      if(q.q){w.push('p.name LIKE ?');p.push('%'+q.q+'%');}
+      if(q.q){w.push(foldsql('p.name')+' LIKE ?');p.push('%'+fold(q.q)+'%');}
       if(q.gender){w.push('p.gender=?');p.push(q.gender);}
       if(q.birth_year){w.push('p.birth_year=?');p.push(+q.birth_year);}
       if(q.city){w.push('p.city=?');p.push(q.city);}
@@ -248,7 +252,7 @@
     },
     tournaments(q){
       const w=['1=1'],p=[];
-      if(q.q){w.push('(t.name LIKE ? OR t.title LIKE ?)');p.push('%'+q.q+'%','%'+q.q+'%');}
+      if(q.q){w.push('('+foldsql('t.name')+' LIKE ? OR '+foldsql('t.title')+' LIKE ?)');p.push('%'+fold(q.q)+'%','%'+fold(q.q)+'%');}
       if(q.city){w.push('t.city=?');p.push(q.city);}
       if(q.year){w.push('t.year=?');p.push(+q.year);}
       const lim=Math.min(+(q.limit||200),600),wc=w.join(' AND ');
@@ -276,7 +280,7 @@
       return {tournament:t,club,categories:cats,matches};
     },
     clubs(q){
-      const w=['1=1'],p=[]; if(q.q){w.push('c.name LIKE ?');p.push('%'+q.q+'%');}
+      const w=['1=1'],p=[]; if(q.q){w.push(foldsql('c.name')+' LIKE ?');p.push('%'+fold(q.q)+'%');}
       const lim=Math.min(+(q.limit||100),600);
       const rows=Q(`SELECT c.club_id,c.name,c.city,
         (SELECT count(*) FROM players pp WHERE pp.club_id=c.club_id) player_count,
@@ -286,9 +290,9 @@
     },
     search(q){
       const t=(q.q||'').trim(); if(t.length<2) return {players:[],clubs:[]};
-      const like='%'+t+'%';
-      return {players:Q('SELECT player_id,name,age_group,rating,club_name FROM player_ratings WHERE name LIKE ? ORDER BY rating DESC LIMIT 15',[like]),
-        clubs:Q('SELECT club_id,name,city FROM clubs WHERE name LIKE ? LIMIT 10',[like])};
+      const like='%'+fold(t)+'%';
+      return {players:Q('SELECT player_id,name,age_group,rating,club_name FROM player_ratings WHERE '+foldsql('name')+' LIKE ? ORDER BY rating DESC LIMIT 15',[like]),
+        clubs:Q('SELECT club_id,name,city FROM clubs WHERE '+foldsql('name')+' LIKE ? LIMIT 10',[like])};
     }
   };
 
