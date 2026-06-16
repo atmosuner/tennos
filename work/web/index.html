@@ -620,7 +620,7 @@ async function player(id){
           <span class="tag">${esc(m.event||'')} ${m.stage?'· '+esc(m.stage):''}</span><br>
           <span class="tag">${m.tournamentId?`<a href="#/tournament/${m.tournamentId}">${esc(m.tournamentName||'turnuva')}</a> · `:''}${esc(m.date||'')}</span>
         </span>
-        <a href="#/h2h/${id}/${m.opponentId}" class="tag" title="head-to-head">H2H</a>
+        <a href="#/compare?a=${id}&b=${m.opponentId}" class="tag" title="head-to-head">H2H</a>
       </div>`;}).join('');
     $('#mlist').innerHTML=`<p class="muted" style="margin:0 0 8px">${ms.length} maç</p>`+(html||'<p class="muted">maç yok</p>');
   }
