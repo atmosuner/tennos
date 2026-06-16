@@ -85,6 +85,34 @@
   .cmp .bar{grid-column:1/4;height:6px;border-radius:4px;background:var(--panel2);display:flex;overflow:hidden}
   .cmp .bar i{display:block;height:100%} .bar .ia{background:var(--accent)} .bar .ib{background:var(--accent2)}
   .win-hi{color:var(--accent)} .win-lo{color:var(--dim)}
+
+  /* ---- Mobile ---- */
+  @media (max-width:760px){
+    header{flex-wrap:wrap;gap:10px;padding:10px 14px}
+    .logo{order:1}
+    .search{order:2;margin-left:auto;width:auto}
+    .search input{width:150px}
+    .results{width:300px;max-width:calc(100vw - 28px)}
+    nav{order:3;width:100%;overflow-x:auto;flex-wrap:nowrap;gap:18px;padding-bottom:2px;-webkit-overflow-scrolling:touch}
+    nav::-webkit-scrollbar{display:none}
+    nav a{white-space:nowrap}
+    main{padding:16px 14px 64px}
+    h1{font-size:20px} h2{font-size:16px;margin:22px 0 10px}
+    .card{padding:13px} .card .v{font-size:22px}
+    .bigrating{font-size:34px}
+    /* tables scroll horizontally instead of clipping */
+    table{display:block;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch}
+    th,td{padding:8px 10px}
+    .pickers{grid-template-columns:1fr;gap:12px}
+    .vs{gap:10px} .vs .c{font-size:30px} .vs .n{font-size:16px}
+    .cmp{gap:5px 10px} .cmp .va,.cmp .vb{font-size:16px}
+    .profile-head{gap:12px}
+    .profile-head>div:last-child{margin-left:0!important;text-align:left!important;width:100%}
+    .bigrating{font-size:30px}
+    .matchline{flex-wrap:wrap;gap:6px 10px}
+    .matchline>span[style*="margin-left:auto"],.matchline>span[style*="margin-left: auto"]{margin-left:0!important;text-align:left!important;flex-basis:100%}
+    .filters input,.filters select{flex:1 1 auto;min-width:0}
+  }
 </style>
 </head>
 <body>
