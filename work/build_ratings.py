@@ -52,6 +52,7 @@ def k_factor(games_played: int) -> float:
 
 
 SCHEMA = """
+DROP TABLE IF EXISTS player_rating_history;
 DROP TABLE IF EXISTS player_ratings;
 CREATE TABLE player_ratings (
     player_id        INTEGER PRIMARY KEY,
@@ -96,6 +97,7 @@ def main() -> int:
 
     rating: dict[int, float] = defaultdict(lambda: START_RATING)
     peak: dict[int, float] = defaultdict(lambda: START_RATING)
+    history: list[tuple] = []
     games = Counter()
     wins = Counter()
     losses = Counter()
@@ -125,6 +127,9 @@ def main() -> int:
                 genders_seen[pid][r["gender"]] += 1
         wins[w] += 1
         losses[l] += 1
+        md = r["match_date"]
+        history.append((w, md, round(rating[w], 1), l, 1))
+        history.append((l, md, round(rating[l], 1), w, 0))
 
     # player metadata
     meta = {
@@ -181,6 +186,13 @@ def main() -> int:
         "CREATE INDEX idx_ratings_gender ON player_ratings(gender, gender_rank);"
         "CREATE INDEX idx_ratings_rating ON player_ratings(rating DESC);"
     )
+    cur.execute(
+        "CREATE TABLE player_rating_history (player_id INTEGER NOT NULL, match_date TEXT, rating_after REAL NOT NULL, opponent_id INTEGER, won INTEGER)"
+    )
+    cur.executemany(
+        "INSERT INTO player_rating_history VALUES (?,?,?,?,?)", history
+    )
+    cur.execute("CREATE INDEX idx_rh_player ON player_rating_history(player_id)")
     conn.commit()
 
     print(f"rated players={len(records)} matches_used={len(rows)}")

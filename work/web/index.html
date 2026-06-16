@@ -314,13 +314,14 @@ syncThemeBtn();
   const dkey=s=>{const m=/(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{4})/.exec(s||'');return m?(+m[3])*1e4+(+m[2])*100+(+m[1]):0;};
 
   function playerMatches(pid){
-    const rows=Q(`SELECT m.match_id,m.match_date,m.event,m.stage,m.winner_id,m.loser_id,m.p1_id,m.tournament_id,t.name tname,t.city
+    const rows=Q(`SELECT m.match_id,m.match_date,m.event,m.age_group,m.stage,m.winner_id,m.loser_id,m.p1_id,m.tournament_id,m.result_type,t.name tname,t.city
       FROM matches m LEFT JOIN tournaments t ON t.tournament_id=m.tournament_id
       WHERE (m.winner_id=? OR m.loser_id=?) AND m.winner_id IS NOT NULL AND m.loser_id IS NOT NULL`,[pid,pid]);
     rows.sort((x,y)=>dkey(y.match_date)-dkey(x.match_date));
     return rows.map(r=>{const won=r.winner_id===pid, opp=won?r.loser_id:r.winner_id;
-      return {matchId:r.match_id,date:r.match_date,event:r.event,stage:r.stage,won,opponentId:opp,opponentName:nameOf(opp),
-        score:buildScore(r.match_id,won?(r.p1_id===pid):(r.p1_id===pid)),tournamentId:r.tournament_id,tournamentName:r.tname,city:r.city};});
+      return {matchId:r.match_id,date:r.match_date,event:r.event,ageGroup:r.age_group,stage:r.stage,won,
+        resultType:r.result_type,opponentId:opp,opponentName:nameOf(opp),
+        score:buildScore(r.match_id,r.p1_id===pid),tournamentId:r.tournament_id,tournamentName:r.tname,city:r.city};});
   }
   function matchesBetween(p,opp){
     const rows=Q(`SELECT m.match_id,m.match_date,m.event,m.stage,m.winner_id,m.p1_id,m.tournament_id,t.name tname
@@ -368,7 +369,8 @@ syncThemeBtn();
       for(const m of matches){const st=m.stage||'—';(stages[st]=stages[st]||{w:0,l:0})[m.won?'w':'l']++;
         const o=opp[m.opponentId]=opp[m.opponentId]||{name:m.opponentName,w:0,l:0};o[m.won?'w':'l']++;}
       const top=Object.entries(opp).map(([k,v])=>({playerId:+k,...v,total:v.w+v.l})).sort((a,b)=>b.total-a.total).slice(0,8);
-      return {player:base,rating,recentMatches:matches.slice(0,25),totalMatches:matches.length,stageRecord:stages,topOpponents:top};
+      const ratingHistory=Q('SELECT match_date,rating_after FROM player_rating_history WHERE player_id=? ORDER BY rowid',[id]);
+      return {player:base,rating,recentMatches:matches,totalMatches:matches.length,stageRecord:stages,topOpponents:top,ratingHistory};
     },
     h2h(a,b){a=+a;b=+b;
       const rows=Q(`SELECT m.match_id,m.match_date,m.event,m.stage,m.winner_id,m.loser_id,m.p1_id,m.tournament_id,t.name tname
@@ -569,17 +571,66 @@ async function player(id){
   const pct=wins+losses?Math.round(wins/(wins+losses)*100):0;
   const stages=Object.entries(d.stageRecord).map(([s,v])=>`<tr><td>${esc(s)}</td><td>${fmtWL(v.w,v.l)}</td></tr>`).join('');
   const opps=d.topOpponents.map(o=>`<div class="matchline"><a href="#/h2h/${id}/${o.playerId}">${esc(o.name)}</a><span style="margin-left:auto">${fmtWL(o.w,o.l)}</span></div>`).join('')||'<p class="muted">—</p>';
-  const matches=d.recentMatches.map(m=>`
-    <div class="matchline">
-      <span class="badge ${m.won?'W':'L'}">${m.won?'G':'M'}</span>
-      <a href="#/player/${m.opponentId}">${esc(m.opponentName)}</a>
-      <span class="score muted">${esc(m.score)}</span>
-      <span style="margin-left:auto;text-align:right">
-        <span class="tag">${esc(m.event||'')} ${m.stage?'· '+esc(m.stage):''}</span><br>
-        <span class="tag">${m.tournamentId?`<a href="#/tournament/${m.tournamentId}">${esc(m.tournamentName||'turnuva')}</a> · `:''}${esc(m.date||'')}</span>
-      </span>
-      <a href="#/h2h/${id}/${m.opponentId}" class="tag" title="head-to-head">H2H</a>
-    </div>`).join('');
+  const allMatches=d.recentMatches;
+  const years=[...new Set(allMatches.map(m=>(m.date||'').split('.')[2]).filter(Boolean))].sort((a,b)=>b-a);
+  const ageGroups=[...new Set(allMatches.map(m=>m.ageGroup).filter(Boolean))].sort((a,b)=>a-b);
+
+  // --- Chart 1: Son Form Bandı (last 30 completed) ---
+  const completedForForm=allMatches.filter(m=>m.resultType==='completed').slice(0,30).reverse();
+  const formBand=completedForForm.map(m=>`<span title="${esc(m.opponentName||'')} · ${esc(m.date||'')}" style="display:inline-block;width:18px;height:18px;border-radius:4px;background:${m.won?'var(--win)':'var(--loss)'};opacity:.85;cursor:default"></span>`).join('');
+
+  // --- Chart 2: Yıllık G/M ---
+  const byYear={};
+  allMatches.filter(m=>m.resultType==='completed').forEach(m=>{const y=(m.date||'').split('.')[2];if(!y)return;(byYear[y]=byYear[y]||{w:0,l:0})[m.won?'w':'l']++;});
+  const yearEntries=Object.entries(byYear).sort(([a],[b])=>a-b);
+  const maxTotal=Math.max(...yearEntries.map(([,v])=>v.w+v.l),1);
+  const yearBars=yearEntries.map(([y,v])=>{const tot=v.w+v.l;const pct=Math.round(v.w/tot*100);
+    return `<div style="display:flex;align-items:center;gap:10px;margin:5px 0">
+      <span style="width:36px;text-align:right;color:var(--dim);font-size:12px">${y}</span>
+      <div style="flex:1;height:20px;border-radius:6px;overflow:hidden;background:var(--panel2);display:flex">
+        <div style="width:${v.w/maxTotal*100}%;background:var(--win);opacity:.8"></div>
+        <div style="width:${v.l/maxTotal*100}%;background:var(--loss);opacity:.8"></div>
+      </div>
+      <span style="width:80px;font-size:12px;color:var(--dim)">${v.w}G ${v.l}M · %${pct}</span>
+    </div>`;}).join('');
+
+  function renderMatches(filter,year,ag){
+    const ms=allMatches.filter(m=>
+      (!filter||(filter==='W'?m.won:!m.won))&&
+      (!year||(m.date||'').endsWith(year))&&
+      (!ag||m.ageGroup==ag));
+    const html=ms.map(m=>{
+      const rt=m.resultType;
+      const badge=rt==='walkover'?`<span class="badge" style="background:var(--panel2);color:var(--dim);border:1px solid var(--line)">W.O.</span>`:
+                  rt==='retirement'?`<span class="badge" style="background:var(--panel2);color:var(--dim);border:1px solid var(--line)">Ret.</span>`:
+                  `<span class="badge ${m.won?'W':'L'}">${m.won?'G':'M'}</span>`;
+      return `<div class="matchline">
+        ${badge}
+        <a href="#/player/${m.opponentId}">${esc(m.opponentName)}</a>
+        <span class="score muted">${esc(m.score)}</span>
+        <span style="margin-left:auto;text-align:right">
+          <span class="tag">${esc(m.event||'')} ${m.stage?'· '+esc(m.stage):''}</span><br>
+          <span class="tag">${m.tournamentId?`<a href="#/tournament/${m.tournamentId}">${esc(m.tournamentName||'turnuva')}</a> · `:''}${esc(m.date||'')}</span>
+        </span>
+        <a href="#/h2h/${id}/${m.opponentId}" class="tag" title="head-to-head">H2H</a>
+      </div>`;}).join('');
+    $('#mlist').innerHTML=`<p class="muted" style="margin:0 0 8px">${ms.length} maç</p>`+(html||'<p class="muted">maç yok</p>');
+  }
+  window._renderMatches=renderMatches;
+
+  // --- Chart 3: Reyting history (Chart.js) ---
+  async function drawRatingChart(){
+    if(!window.Chart){
+      await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});
+    }
+    const hist=d.ratingHistory;
+    if(!hist||!hist.length){$('#ratingChartWrap').innerHTML='<p class="muted">veri yok</p>';return;}
+    const labels=hist.map((_,i)=>i+1);
+    const data=hist.map(h=>h.rating_after);
+    const isDark=document.documentElement.getAttribute('data-theme')==='dark';
+    const accentColor=isDark?'#54d069':'#1f8a3b';
+    new window.Chart($('#ratingChart'),{type:'line',data:{labels,datasets:[{data,borderColor:accentColor,borderWidth:2,pointRadius:0,fill:true,backgroundColor:isDark?'rgba(84,208,105,.08)':'rgba(31,138,59,.07)',tension:.3}]},options:{plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`Reyting: ${Math.round(ctx.parsed.y)}`}}},scales:{x:{display:false},y:{grid:{color:isDark?'rgba(255,255,255,.06)':'rgba(0,0,0,.06)'},ticks:{color:'var(--dim)',font:{size:11}}}},animation:{duration:600}}});
+  }
   app().innerHTML=`
     <div class="profile-head">
       <div>
@@ -601,15 +652,38 @@ async function player(id){
       <div class="card"><div class="v">${pct}%</div><div class="l">Kazanma · ${wins}-${losses}</div></div>
       <div class="card"><div class="v">${d.totalMatches}</div><div class="l">Toplam Maç</div></div>
     </div>
+    <div class="section-block" style="margin-bottom:28px">
+      <h2>Son Form Bandı <span class="muted" style="font-size:13px;font-weight:400">(son 30 biten maç)</span></h2>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;padding:8px 0">${formBand||'<p class="muted">veri yok</p>'}</div>
+    </div>
+    <div class="section-block" style="margin-bottom:28px">
+      <h2>Yıllık G/M</h2>
+      ${yearBars||'<p class="muted">veri yok</p>'}
+    </div>
+    <div class="section-block" style="margin-bottom:28px">
+      <h2>Reyting Grafiği</h2>
+      <div id="ratingChartWrap" style="position:relative;height:180px"><canvas id="ratingChart"></canvas></div>
+    </div>
     <div class="row">
       <div class="col">
-        <h2>Son Maçlar</h2>${matches||'<p class="muted">maç yok</p>'}
+        <h2>Maçlar</h2>
+        <div class="filters" style="margin-bottom:12px">
+          <select id="mYear"><option value="">Tüm Yıllar</option>${years.map(y=>`<option value="${y}">${y}</option>`).join('')}</select>
+          <select id="mRes"><option value="">Tümü</option><option value="W">Galibiyet</option><option value="L">Mağlubiyet</option></select>
+          ${ageGroups.length>1?`<select id="mAg"><option value="">Tüm Kategoriler</option>${ageGroups.map(a=>`<option value="${a}">${a} Yaş</option>`).join('')}</select>`:''}
+        </div>
+        <div id="mlist"></div>
       </div>
       <div class="col" style="max-width:340px">
         <h2>Aşama Karnesi</h2><table><tbody>${stages||'<tr><td class="muted">—</td></tr>'}</tbody></table>
         <h2>En Çok Karşılaşılan</h2>${opps}
       </div>
     </div>`;
+  const upd=()=>window._renderMatches($('#mRes').value,$('#mYear').value,$('#mAg')?$('#mAg').value:'');
+  $('#mYear').onchange=upd; $('#mRes').onchange=upd;
+  if($('#mAg')) $('#mAg').onchange=upd;
+  renderMatches('','','');
+  drawRatingChart();
 }
 
 // ---------- H2H ----------
