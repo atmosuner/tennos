@@ -585,7 +585,7 @@ async function player(id){
     const col=done?(m.won?'#fff':'#fff'):'var(--dim)';
     const brd=(!done)?'1px solid var(--line)':'none';
     const txt=wo?'WO':ret?'Ret':(m.won?'G':'M');
-    return `<span title="${esc(m.opponentName||'')} · ${esc(m.date||'')}" style="aspect-ratio:1;border-radius:6px;background:${bg};border:${brd};color:${col};font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:default;min-height:32px">${txt}</span>`;
+    return `<span title="${esc(m.opponentName||'')} · ${esc(m.date||'')}" style="border-radius:6px;background:${bg};border:${brd};color:${col};font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:default">${txt}</span>`;
   }).join('');
 
   // --- Chart 2: Yıllık G/M ---
@@ -662,7 +662,7 @@ async function player(id){
     </div>
     <div class="card" style="padding:20px 22px;margin-bottom:14px">
       <h2 style="margin:0 0 14px">Son Form Bandı <span class="muted" style="font-size:13px;font-weight:400">(son 30 maç)</span></h2>
-      ${formBand?`<div style="display:grid;grid-template-columns:repeat(${recentForForm.length},1fr);gap:4px">${formBand}</div>`:'<p class="muted">veri yok</p>'}
+      ${formBand?`<div style="display:grid;grid-template-columns:repeat(${recentForForm.length},1fr);gap:4px;height:36px">${formBand}</div>`:'<p class="muted">veri yok</p>'}
     </div>
     <div class="charts-row" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:28px;align-items:stretch">
       <div class="card" style="padding:20px 22px;display:flex;flex-direction:column">
