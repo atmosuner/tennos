@@ -638,7 +638,7 @@ async function player(id){
     const data=hist.map(h=>h.rating_after);
     const isDark=document.documentElement.getAttribute('data-theme')==='dark';
     const accentColor=isDark?'#54d069':'#1f8a3b';
-    new window.Chart($('#ratingChart'),{type:'line',data:{labels,datasets:[{data,borderColor:accentColor,borderWidth:2,pointRadius:0,fill:true,backgroundColor:isDark?'rgba(84,208,105,.08)':'rgba(31,138,59,.07)',tension:.3}]},options:{plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`Reyting: ${Math.round(ctx.parsed.y)}`}}},scales:{x:{display:false},y:{grid:{color:isDark?'rgba(255,255,255,.06)':'rgba(0,0,0,.06)'},ticks:{color:'var(--dim)',font:{size:11}}}},animation:{duration:600}}});
+    new window.Chart($('#ratingChart'),{type:'line',data:{labels,datasets:[{data,borderColor:accentColor,borderWidth:2,pointRadius:0,fill:true,backgroundColor:isDark?'rgba(84,208,105,.08)':'rgba(31,138,59,.07)',tension:.3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`Reyting: ${Math.round(ctx.parsed.y)}`}}},scales:{x:{display:false},y:{grid:{color:isDark?'rgba(255,255,255,.06)':'rgba(0,0,0,.06)'},ticks:{color:'var(--dim)',font:{size:11}}}},animation:{duration:600}}});
   }
   app().innerHTML=`
     <div class="profile-head">
@@ -672,7 +672,7 @@ async function player(id){
       </div>
       <div class="card" style="padding:20px 22px">
         <h2 style="margin:0 0 14px">Reyting Grafiği</h2>
-        <div id="ratingChartWrap" style="position:relative;height:160px"><canvas id="ratingChart"></canvas></div>
+        <div id="ratingChartWrap" style="position:relative;width:100%;height:160px"><canvas id="ratingChart"></canvas></div>
       </div>
     </div>
     <div class="row">
