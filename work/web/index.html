@@ -577,7 +577,7 @@ async function player(id){
 
   // --- Chart 1: Son Form Bandı (last 30 completed) ---
   const completedForForm=allMatches.filter(m=>m.resultType==='completed').slice(0,30).reverse();
-  const formBand=completedForForm.map(m=>`<span title="${esc(m.opponentName||'')} · ${esc(m.date||'')}" style="display:inline-block;width:18px;height:18px;border-radius:4px;background:${m.won?'var(--win)':'var(--loss)'};opacity:.85;cursor:default"></span>`).join('');
+  const formBand=completedForForm.map(m=>`<span title="${esc(m.opponentName||'')} · ${esc(m.date||'')}" style="aspect-ratio:1;border-radius:4px;background:${m.won?'var(--win)':'var(--loss)'};opacity:.85;cursor:default"></span>`).join('');
 
   // --- Chart 2: Yıllık G/M ---
   const byYear={};
@@ -654,15 +654,17 @@ async function player(id){
     </div>
     <div class="section-block" style="margin-bottom:28px">
       <h2>Son Form Bandı <span class="muted" style="font-size:13px;font-weight:400">(son 30 biten maç)</span></h2>
-      <div style="display:flex;flex-wrap:wrap;gap:4px;padding:8px 0">${formBand||'<p class="muted">veri yok</p>'}</div>
+      ${formBand?`<div style="display:grid;grid-template-columns:repeat(${completedForForm.length},1fr);gap:4px;padding:4px 0">${formBand}</div>`:'<p class="muted">veri yok</p>'}
     </div>
-    <div class="section-block" style="margin-bottom:28px">
-      <h2>Yıllık G/M</h2>
-      ${yearBars||'<p class="muted">veri yok</p>'}
-    </div>
-    <div class="section-block" style="margin-bottom:28px">
-      <h2>Reyting Grafiği</h2>
-      <div id="ratingChartWrap" style="position:relative;height:180px"><canvas id="ratingChart"></canvas></div>
+    <div class="row" style="margin-bottom:28px">
+      <div class="col">
+        <h2>Yıllık G/M</h2>
+        ${yearBars||'<p class="muted">veri yok</p>'}
+      </div>
+      <div class="col">
+        <h2>Reyting Grafiği</h2>
+        <div id="ratingChartWrap" style="position:relative;height:180px"><canvas id="ratingChart"></canvas></div>
+      </div>
     </div>
     <div class="row">
       <div class="col">
