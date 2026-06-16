@@ -497,6 +497,17 @@ async function home(){
       <div class="card"><div class="v">${s.clubs.toLocaleString('tr')}</div><div class="l">Kulüp</div></div>
     </div>
     <div style="margin:10px 0 24px">${ages}</div>
+    <details style="margin:0 0 28px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 18px">
+      <summary style="cursor:pointer;font-weight:700;color:var(--txt2);font-size:13.5px;letter-spacing:.01em;list-style:none;display:flex;align-items:center;gap:8px">
+        <span style="color:var(--accent-ink)">▸</span> Elo reyting nasıl hesaplanır?
+      </summary>
+      <div style="margin-top:12px;color:var(--dim);font-size:13.5px;line-height:1.7;display:grid;gap:8px">
+        <p style="margin:0">Her oyuncu <b style="color:var(--txt2)">1500</b> puanla başlar. Maç kazanınca puan kazanırsın, kaybedince puan verirsin.</p>
+        <p style="margin:0">Her maçta kazanılan ya da kaybedilen puan, rakibinin gücüne göre hesaplanır. Eşit güçte biriyle oynayınca kazanırsan <b style="color:var(--txt2)">+20</b>, kaybedersen <b style="color:var(--txt2)">−20</b>. Çok daha güçlü birine karşı kazanırsan +35'e kadar çıkabilir; çok daha zayıfa kaybedersen −35'e kadar düşebilir. Bu yüzden reytingler 1982, 1647 gibi kesirli sayılar olur — her maç farklı miktarda puan ekler ya da çıkarır.</p>
+        <p style="margin:0">İlk 30 maçta puan iki kat hızlı değişir (yeni oyuncuların yeri daha çabuk belirlenir), sonra yavaşlar.</p>
+        <p style="margin:0">Sadece biten maçlar sayılır — skor girilmemişse, walkover veya emeklilik varsa sayılmaz. Sıralamaya girmek için en az 5 maç gerekir.</p>
+      </div>
+    </details>
     <h2>Genel Top 15</h2>
     <div id="top" class="loading">…</div>`;
   const r=await api('/rankings?limit=15');
