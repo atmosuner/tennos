@@ -661,18 +661,18 @@ async function player(id){
       <div class="card"><div class="v">${pct}%</div><div class="l">Kazanma · ${wins}-${losses}</div></div>
       <div class="card"><div class="v">${d.totalMatches}</div><div class="l">Toplam Maç</div></div>
     </div>
-    <div class="section-block" style="margin-bottom:28px">
-      <h2>Son Form Bandı <span class="muted" style="font-size:13px;font-weight:400">(son 30 biten maç)</span></h2>
-      ${formBand?`<div style="display:grid;grid-template-columns:repeat(${recentForForm.length},1fr);gap:4px;padding:4px 0">${formBand}</div>`:'<p class="muted">veri yok</p>'}
+    <div class="card" style="padding:20px 22px;margin-bottom:14px">
+      <h2 style="margin:0 0 14px">Son Form Bandı <span class="muted" style="font-size:13px;font-weight:400">(son 30 maç)</span></h2>
+      ${formBand?`<div style="display:grid;grid-template-columns:repeat(${recentForForm.length},1fr);gap:4px">${formBand}</div>`:'<p class="muted">veri yok</p>'}
     </div>
-    <div class="charts-row" style="display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-bottom:28px">
-      <div>
-        <h2>Yıllık G/M</h2>
+    <div class="charts-row" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:28px">
+      <div class="card" style="padding:20px 22px">
+        <h2 style="margin:0 0 14px">Yıllık G/M</h2>
         ${yearBars||'<p class="muted">veri yok</p>'}
       </div>
-      <div>
-        <h2>Reyting Grafiği</h2>
-        <div id="ratingChartWrap" style="position:relative;height:180px"><canvas id="ratingChart"></canvas></div>
+      <div class="card" style="padding:20px 22px">
+        <h2 style="margin:0 0 14px">Reyting Grafiği</h2>
+        <div id="ratingChartWrap" style="position:relative;height:160px"><canvas id="ratingChart"></canvas></div>
       </div>
     </div>
     <div class="row">
