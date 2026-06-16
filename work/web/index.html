@@ -220,6 +220,7 @@
     .filters input,.filters select{flex:1 1 auto;min-width:0}
     .results{position:fixed;left:8px;right:8px;top:62px;width:auto;max-width:none}
     .picker .results{position:absolute;left:0;right:auto;top:54px;width:100%}
+    .charts-row{grid-template-columns:1fr!important}
   }
 </style>
 </head>
@@ -664,12 +665,12 @@ async function player(id){
       <h2>Son Form Bandı <span class="muted" style="font-size:13px;font-weight:400">(son 30 biten maç)</span></h2>
       ${formBand?`<div style="display:grid;grid-template-columns:repeat(${recentForForm.length},1fr);gap:4px;padding:4px 0">${formBand}</div>`:'<p class="muted">veri yok</p>'}
     </div>
-    <div class="row" style="margin-bottom:28px">
-      <div class="col">
+    <div class="charts-row" style="display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-bottom:28px">
+      <div>
         <h2>Yıllık G/M</h2>
         ${yearBars||'<p class="muted">veri yok</p>'}
       </div>
-      <div class="col">
+      <div>
         <h2>Reyting Grafiği</h2>
         <div id="ratingChartWrap" style="position:relative;height:180px"><canvas id="ratingChart"></canvas></div>
       </div>
