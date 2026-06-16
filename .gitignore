@@ -1,0 +1,26 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.tmp
+
+# Regenerable scraped data (re-create with the pipeline)
+outputs/
+
+# Raw HTML caches (huge, regenerable)
+work/ikort_cache/
+work/ikort_clubs_cache/
+work/ikort_players_cache/
+
+# Stray local HTML/headers under work/ (not work/web/)
+/work/*.html
+/work/*.headers
+
+# Keep the shipped browser database (needed by the static site):
+!work/web/tennos-web.db.gz
+
+# Secrets — never commit session cookies
+work/ikort_cookies.txt
+work/*.txt
