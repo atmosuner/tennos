@@ -159,6 +159,7 @@
   .col{flex:1;min-width:300px}
   .matchline{display:flex;align-items:center;gap:11px;padding:11px 0;border-bottom:1px solid var(--line)}
   .matchline:last-child{border:none}
+  .sc-ic{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:18px;padding:0 4px;border-radius:3px;background:var(--panel2);border:1px solid var(--line);font-size:10px;font-weight:700;color:var(--dim);cursor:help;flex-shrink:0;font-variant-numeric:tabular-nums;white-space:nowrap;text-decoration:none}
   .score{font-family:var(--font-disp);font-variant-numeric:tabular-nums;font-weight:700;white-space:nowrap;letter-spacing:.01em}
 
   /* ---------- VS / H2H ---------- */
@@ -530,7 +531,8 @@ syncThemeBtn();
         byGender[g].total++;
         if(aw)byGender[g].aWins++;else byGender[g].bWins++;
       }
-      return {matches:rows,aWins,bWins,total:rows.length,byGender};
+      const matches=rows.map(r=>({...r,score:buildScore(r.match_id,r.winner_id===r.p1_id)}));
+      return {matches,aWins,bWins,total:matches.length,byGender};
     }
   };
 
@@ -1069,15 +1071,19 @@ async function renderClubCompare(a,b,an,bn){
     const na=gd.aWins,nb=gd.bWins;
     return `<div class="cmp"><div class="va ${na>nb?'win-hi':'win-lo'}">${na}G</div><div class="lbl" style="grid-column:2;margin:0">${g} <span class="muted" style="font-size:11px">(${gd.total})</span></div><div class="vb ${nb>na?'win-hi':'win-lo'}">${nb}G</div>${bar(na,nb)}</div>`;
   };;
-  const matchLines=cv.matches.map(m=>{
+  const mkLine=(m)=>{
     const aWon=m.winner_club===+a;
-    const gcol=m.match_gender==='Erkek'?'#4ab0ff':m.match_gender==='Kadın'?'#ff7ab0':'var(--dim)';
+    const sc=m.score?`<span class="sc-ic" title="${esc(m.score)}">${esc(m.score.split(' ')[0])}</span>`:'';
+    const info=[m.tournament_name,m.event,m.stage,m.match_date].filter(Boolean).join(' · ');
+    const ti=info?(m.tournament_id?`<a href="#/tournament/${m.tournament_id}" class="sc-ic" title="${esc(info)}" style="font-style:italic">i</a>`:`<span class="sc-ic" title="${esc(info)}" style="font-style:italic;cursor:help">i</span>`):'';
     return `<div class="matchline">
-      <span class="badge ${aWon?'W':'L'}">${esc(aWon?an.split(' ')[0]:bn.split(' ')[0])}</span>
-      <span><a href="#/player/${m.winner_id}">${esc(m.winner_name)}</a> · <a href="#/player/${m.loser_id}">${esc(m.loser_name)}</a></span>
-      <span style="margin-left:auto;display:flex;align-items:center;gap:6px">${m.match_gender?`<span style="font-size:11px;font-weight:700;color:${gcol}">${m.match_gender[0]}</span>`:''}
-        <span class="tag">${esc(m.event||'')}${m.stage?' · '+esc(m.stage):''} · ${esc(m.match_date||'')}</span></span>
-    </div>`;}).join('')||'<p class="muted" style="text-align:center">Karşılaşma kaydı yok.</p>';
+      <span class="badge W">${esc(aWon?an.split(' ')[0]:bn.split(' ')[0])}</span>
+      <span><b><a href="#/player/${m.winner_id}">${esc(m.winner_name)}</a></b> · <a href="#/player/${m.loser_id}" class="muted">${esc(m.loser_name)}</a></span>
+      <span style="margin-left:auto;display:flex;gap:4px;align-items:center;flex-shrink:0">${sc}${ti}</span>
+    </div>`;};
+  const erkekMs=cv.matches.filter(m=>m.match_gender==='Erkek');
+  const kadinMs=cv.matches.filter(m=>m.match_gender==='Kadın');
+  const col=(ms,lbl,col)=>`<div class="col"><h3 style="margin:0 0 10px;color:${col};font-size:14px">${lbl} · ${ms.length}</h3>${ms.map(mkLine).join('')||'<p class="muted" style="text-align:center">kayıt yok</p>'}</div>`;
   const genderRows=genders.length?`
     ${gRow('Erkek')}
     ${gRow('Kadın')}`:'';
@@ -1101,7 +1107,10 @@ async function renderClubCompare(a,b,an,bn){
         <table><thead><tr><th>Oyuncu</th><th></th><th>Reyting</th></tr></thead><tbody>${bp.map(prow).join('')||'<tr><td colspan="3" class="muted">kayıt yok</td></tr>'}</tbody></table></div>
     </div>
     <h2 style="text-align:center">Kulüpler Arası Maçlar · ${tot}</h2>
-    <div style="max-width:680px;margin:0 auto">${matchLines}</div>`;
+    <div class="row" style="gap:16px;max-width:900px;margin:0 auto;align-items:start">
+      ${col(erkekMs,'Erkek','#4ab0ff')}
+      ${col(kadinMs,'Kadın','#ff7ab0')}
+    </div>`;
 }
 
 async function renderSlot(slot,id){
