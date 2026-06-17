@@ -1063,7 +1063,7 @@ async function renderClubCompare(a,b,an,bn){
   const prow=p=>`<tr><td><a href="#/player/${p.player_id}">${esc(p.name)}</a></td><td>${ageP(p.age_group)}</td><td class="rating">${Math.round(p.rating)}</td></tr>`;
   const aW=cv.aWins||0,bW=cv.bWins||0,tot=cv.total||0;
   const bg=cv.byGender||{};
-  const genders=['Erkek','Kız'].filter(g=>bg[g]);
+  const genders=['Erkek','Kadın'].filter(g=>bg[g]);
   const gRow=g=>{
     const gd=bg[g]||{aWins:0,bWins:0,total:0};
     const na=gd.aWins,nb=gd.bWins;
@@ -1071,7 +1071,7 @@ async function renderClubCompare(a,b,an,bn){
   };;
   const matchLines=cv.matches.map(m=>{
     const aWon=m.winner_club===+a;
-    const gcol=m.match_gender==='Erkek'?'#4ab0ff':m.match_gender==='Kız'?'#ff7ab0':'var(--dim)';
+    const gcol=m.match_gender==='Erkek'?'#4ab0ff':m.match_gender==='Kadın'?'#ff7ab0':'var(--dim)';
     return `<div class="matchline">
       <span class="badge ${aWon?'W':'L'}">${esc(aWon?an.split(' ')[0]:bn.split(' ')[0])}</span>
       <span><a href="#/player/${m.winner_id}">${esc(m.winner_name)}</a> · <a href="#/player/${m.loser_id}">${esc(m.loser_name)}</a></span>
@@ -1080,7 +1080,7 @@ async function renderClubCompare(a,b,an,bn){
     </div>`;}).join('')||'<p class="muted" style="text-align:center">Karşılaşma kaydı yok.</p>';
   const genderRows=genders.length?`
     ${gRow('Erkek')}
-    ${gRow('Kız')}`:'';
+    ${gRow('Kadın')}`:'';
   $('#clubCmpOut').innerHTML=`
     <div class="vs">
       <div style="text-align:right"><div class="n"><a href="#/rankings${qs({club_id:a,club_name:an})}">${esc(an)}</a></div><div class="tag">${ra.total} ratingli oyuncu</div></div>
