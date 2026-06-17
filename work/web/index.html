@@ -554,7 +554,7 @@ function renderCmpBar(){
 function updateCmpBtns(){
   document.querySelectorAll('.cmp-btn[data-pid]').forEach(btn=>{
     const in_=cmpSlots.some(s=>s&&s.id===btn.dataset.pid);
-    btn.textContent=in_?'✓':'⊕';btn.classList.toggle('in-slot',in_);
+    btn.textContent=in_?'✓':'⇄';btn.classList.toggle('in-slot',in_);
   });
 }
 
@@ -604,7 +604,7 @@ function rankTable(rows, rankField){
       const undef=p.losses===0&&p.wins>=10?' <span class="undef" title="namağlup">★</span>':'';
       const inSlot=cmpSlots.some(s=>s&&s.id===String(p.player_id));
       return `<tr>
-        <td style="padding:0 4px"><button class="cmp-btn ${inSlot?'in-slot':''}" data-pid="${p.player_id}" data-name="${esc(p.name)}" onclick="addToCmp(this.dataset.pid,this.dataset.name)" title="Karşılaştırmaya ekle">${inSlot?'✓':'⊕'}</button></td>
+        <td style="padding:0 4px"><button class="cmp-btn ${inSlot?'in-slot':''}" data-pid="${p.player_id}" data-name="${esc(p.name)}" onclick="addToCmp(this.dataset.pid,this.dataset.name)" title="Karşılaştırmaya ekle">${inSlot?'✓':'⇄'}</button></td>
         <td class="rank ${rk<=3?'top':''}">${rk}</td>
         <td><a href="#/player/${p.player_id}">${esc(p.name)}</a>${undef}</td>
         <td class="muted">${p.birth_year||'—'}</td>
@@ -871,7 +871,7 @@ async function players_dir(params){
   $('#pl').outerHTML=`<div id="pl"><p class="muted" style="margin:0 0 10px">${d.total.toLocaleString('tr')} oyuncu</p>
     <table><thead><tr><th></th><th>Oyuncu</th><th>Doğum</th><th>Cinsiyet</th><th>Kulüp</th><th>Şehir</th><th>Reyting</th></tr></thead><tbody>
     ${d.players.map(p=>{const inSlot=cmpSlots.some(s=>s&&s.id===String(p.player_id));return`<tr>
-      <td style="padding:0 4px"><button class="cmp-btn ${inSlot?'in-slot':''}" data-pid="${p.player_id}" data-name="${esc(p.name)}" onclick="addToCmp(this.dataset.pid,this.dataset.name)" title="Karşılaştırmaya ekle">${inSlot?'✓':'⊕'}</button></td>
+      <td style="padding:0 4px"><button class="cmp-btn ${inSlot?'in-slot':''}" data-pid="${p.player_id}" data-name="${esc(p.name)}" onclick="addToCmp(this.dataset.pid,this.dataset.name)" title="Karşılaştırmaya ekle">${inSlot?'✓':'⇄'}</button></td>
       <td><a href="#/player/${p.player_id}">${esc(p.name)}</a></td>
       <td class="muted">${p.birth_year||'—'}</td>
       <td>${genderP(p.gender)}</td>
