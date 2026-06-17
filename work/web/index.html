@@ -412,6 +412,9 @@ syncThemeBtn();
     },
     tournaments(q){
       const w=['1=1'],p=[];
+      if(q.liga){w.push("t.source_tab='gelisimLigi'");}
+      else if(q.include_ongoing){w.push("t.source_tab IN ('gecmis','guncel')");}
+      else{w.push("t.source_tab='gecmis'");}
       if(q.q){w.push('('+foldsql('t.name')+' LIKE ? OR '+foldsql('t.title')+' LIKE ?)');p.push('%'+fold(q.q)+'%','%'+fold(q.q)+'%');}
       if(q.city){w.push('t.city=?');p.push(q.city);}
       if(q.year){w.push('t.year=?');p.push(+q.year);}
@@ -420,10 +423,9 @@ syncThemeBtn();
       let rows=Q(`SELECT t.tournament_id,t.name,t.city,t.start_date,t.year,t.type_text,t.surface,t.court_type,c.name club_name,
         (SELECT count(*) FROM matches m WHERE m.tournament_id=t.tournament_id AND m.winner_id IS NOT NULL AND m.loser_id IS NOT NULL) match_count
         FROM tournaments t LEFT JOIN clubs c ON c.club_id=t.club_id WHERE ${wc}
-        ORDER BY (match_count>0) DESC,
-          SUBSTR(REPLACE(t.start_date,' ',''),7,4)||SUBSTR(REPLACE(t.start_date,' ',''),4,2)||SUBSTR(REPLACE(t.start_date,' ',''),1,2) DESC,
+        ORDER BY SUBSTR(REPLACE(t.start_date,' ',''),7,4)||SUBSTR(REPLACE(t.start_date,' ',''),4,2)||SUBSTR(REPLACE(t.start_date,' ',''),1,2) DESC,
           t.tournament_id DESC LIMIT ?`,[...p,lim]);
-      if(!q.include_ongoing) rows=rows.filter(r=>r.match_count>0);
+      rows=rows.filter(r=>r.match_count>0);
       const years=Q('SELECT DISTINCT year FROM tournaments WHERE year IS NOT NULL ORDER BY year DESC').map(r=>r.year);
       const age_groups=Q('SELECT DISTINCT age_group FROM matches WHERE age_group IS NOT NULL ORDER BY age_group').map(r=>r.age_group);
       return {total:rows.length,years,age_groups,tournaments:rows};
@@ -777,23 +779,28 @@ async function players_dir(params){
 
 // ---------- Tournaments ----------
 async function tournaments(params){
-  const yr=params.year||'', term=params.q||'', incl=params.include_ongoing||'', ag=params.age_group||'';
-  const nav=()=>location.hash='#/tournaments'+qs({year:$('#tYear').value,q:$('#tQ').value,age_group:$('#tAg').value,include_ongoing:$('#tOngoing').checked?'1':''});
+  const yr=params.year||'', term=params.q||'', incl=params.include_ongoing||'', ag=params.age_group||'', liga=params.liga||'';
+  const basePath=()=>'#/tournaments'+qs({liga:$('#tLiga').dataset.liga});
+  const nav=()=>location.hash='#/tournaments'+qs({liga,year:$('#tYear').value,q:$('#tQ').value,age_group:$('#tAg').value,include_ongoing:(!liga&&$('#tOngoing').checked)?'1':''});
   app().innerHTML=`<h1>Turnuvalar</h1>
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <a class="btn${!liga?' active':''}" href="#/tournaments" style="${!liga?'background:var(--accent);color:#fff;border-color:var(--accent)':''}">Turnuvalar</a>
+      <a class="btn${liga?' active':''}" href="#/tournaments${qs({liga:'1'})}" style="${liga?'background:var(--accent);color:#fff;border-color:var(--accent)':''}">Gelişim Ligi</a>
+    </div>
     <div class="filters">
       <select id="tYear"><option value="">Tüm Yıllar</option></select>
       <select id="tAg"><option value="">Tüm Yaş Grupları</option></select>
       <input id="tQ" value="${esc(term)}" placeholder="turnuva / şehir ara…" style="background:var(--panel2);border:1px solid var(--line);color:var(--txt);padding:8px 12px;border-radius:8px;outline:none;font-size:16px">
-      <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:14px;color:var(--txt2);white-space:nowrap"><input type="checkbox" id="tOngoing" ${incl?'checked':''}> Güncel turnuvaları da göster</label>
+      ${!liga?`<label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:14px;color:var(--txt2);white-space:nowrap"><input type="checkbox" id="tOngoing" ${incl?'checked':''}> Güncel turnuvaları da göster</label>`:'<span id="tOngoing" style="display:none"></span>'}
     </div>
-    <div id="tl" class="loading">…</div>`;
-  const d=await api('/tournaments'+qs({year:yr,q:term,age_group:ag,include_ongoing:incl,limit:400}));
+    <div id="tLiga" data-liga="${liga}" id="tl" class="loading">…</div>`;
+  const d=await api('/tournaments'+qs({year:yr,q:term,age_group:ag,include_ongoing:incl,liga,limit:400}));
   $('#tYear').innerHTML='<option value="">Tüm Yıllar</option>'+d.years.map(y=>`<option value="${y}" ${y==yr?'selected':''}>${y}</option>`).join('');
   $('#tAg').innerHTML='<option value="">Tüm Yaş Grupları</option>'+(d.age_groups||[]).map(a=>`<option value="${a}" ${a==ag?'selected':''}>${a} Yaş</option>`).join('');
   $('#tYear').onchange=nav; $('#tAg').onchange=nav;
-  $('#tOngoing').onchange=nav;
+  if(!liga) $('#tOngoing').onchange=nav;
   let t; $('#tQ').oninput=e=>{clearTimeout(t);t=setTimeout(nav,350);};
-  $('#tl').outerHTML=`<div id="tl"><p class="muted" style="margin:0 0 10px">${d.total} turnuva</p>
+  $('#tLiga').outerHTML=`<div id="tLiga"><p class="muted" style="margin:0 0 10px">${d.total} turnuva</p>
     <table><thead><tr><th>Turnuva</th><th>Tarih</th><th>Şehir</th><th>Kulüp</th><th>Maç</th></tr></thead><tbody>
     ${d.tournaments.map(t=>`<tr>
       <td><a href="#/tournament/${t.tournament_id}">${esc(t.name)}</a></td>
