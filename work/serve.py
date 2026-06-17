@@ -220,6 +220,10 @@ class Handler(BaseHTTPRequestHandler):
             where.append("pr.birth_year=?"); params.append(int(q["birth_year"]))
         if q.get("q"):
             where.append(f"{foldsql('pr.name')} LIKE ?"); params.append(f"%{fold(q['q'])}%")
+        if not q.get("all_time"):
+            from datetime import date, timedelta
+            cutoff = (date.today() - timedelta(days=365)).strftime("%Y%m%d")
+            where.append(f"SUBSTR(pr.last_match_date,7,4)||SUBSTR(pr.last_match_date,4,2)||SUBSTR(pr.last_match_date,1,2)>='{cutoff}'")
         min_matches = int(q.get("min_matches", 5))
         where.append("pr.matches>=?"); params.append(min_matches)
         limit = min(int(q.get("limit", 50)), 500)

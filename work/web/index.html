@@ -350,6 +350,7 @@ syncThemeBtn();
       if(q.gender){w.push('pr.gender=?');p.push(q.gender);}
       if(q.birth_year){w.push('pr.birth_year=?');p.push(+q.birth_year);}
       if(q.q){w.push(foldsql('pr.name')+' LIKE ?');p.push('%'+fold(q.q)+'%');}
+      if(!q.all_time){const c=new Date();c.setFullYear(c.getFullYear()-1);const cs=c.getFullYear()+String(c.getMonth()+1).padStart(2,'0')+String(c.getDate()).padStart(2,'0');w.push(`SUBSTR(pr.last_match_date,7,4)||SUBSTR(pr.last_match_date,4,2)||SUBSTR(pr.last_match_date,1,2)>='${cs}'`);}
       const mm=q.min_matches!=null?+q.min_matches:5; w.push('pr.matches>=?');p.push(mm);
       const lim=Math.min(+(q.limit||50),500), off=+(q.offset||0);
       const ord=q.age_group?'pr.age_group_rank':(q.gender?'pr.gender_rank':'pr.overall_rank');
@@ -576,7 +577,7 @@ async function rankings(params){
   // kat = "12_Erkek" style; fall back to legacy age_group+gender params
   const kat=params.kat||(params.age_group&&params.gender?params.age_group+'_'+params.gender:'');
   const [ag,gn]=kat?kat.split('_'):[(params.age_group||''),(params.gender||'')];
-  const by=params.birth_year||'', cid=params.club_id||'', cnm=params.club_name||'';
+  const by=params.birth_year||'', cid=params.club_id||'', cnm=params.club_name||'', allTime=params.all_time||'';
   const limit=50, page=Math.max(1,parseInt(params.page||'1')), offset=(page-1)*limit;
   const katOpts=['',...[8,9,10,12,14].flatMap(a=>['Erkek','Kadın'].map(g=>`${a}_${g}`))];
   const katLabel=k=>k?(k.split('_')[0]+' Yaş '+k.split('_')[1]):'Tüm Kategoriler';
@@ -589,15 +590,17 @@ async function rankings(params){
         <input id="fClub" placeholder="kulüp ara…" autocomplete="off" value="${esc(cnm)}" style="width:100%;font-size:16px">
         <div class="results" id="fClubRes"></div>
       </div>
+      <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:14px;color:var(--txt2);white-space:nowrap"><input type="checkbox" id="fAllTime" ${allTime?'checked':''}> Tüm zamanlar</label>
     </div>
     <div id="rk" class="loading">…</div>`;
   let _cid=cid, _cnm=cnm;
   const nav=(newCid,newCnm)=>{
     if(newCid!==undefined){_cid=newCid;_cnm=newCnm||'';}
-    location.hash='#/rankings'+qs({kat:$('#fKat').value,birth_year:$('#fYear').value,club_id:_cid,club_name:_cnm});
+    location.hash='#/rankings'+qs({kat:$('#fKat').value,birth_year:$('#fYear').value,club_id:_cid,club_name:_cnm,all_time:$('#fAllTime').checked?'1':''});
   };
   $('#fKat').onchange=()=>nav();
   $('#fYear').onchange=()=>nav();
+  $('#fAllTime').onchange=()=>nav();
   const clubInp=$('#fClub'), clubRes=$('#fClubRes');
   let ct;
   clubInp.oninput=()=>{
@@ -614,7 +617,7 @@ async function rankings(params){
     },200);
   };
   clubInp.onblur=()=>setTimeout(()=>clubRes.classList.remove('show'),200);
-  const r=await api('/rankings'+qs({age_group:ag,gender:gn,birth_year:by,club_id:cid,limit,offset}));
+  const r=await api('/rankings'+qs({age_group:ag,gender:gn,birth_year:by,club_id:cid,all_time:allTime,limit,offset}));
   $('#fYear').innerHTML='<option value="">Tüm Doğum Yılları</option>'+(r.years||[]).map(y=>`<option value="${y}" ${y==by?'selected':''}>${y}</option>`).join('');
   const rankField=ag?'age_group_rank':(gn?'gender_rank':'overall_rank');
   const labelParts=[kat?katLabel(kat):'',by?by+' doğumlu':'',cnm].filter(Boolean);
