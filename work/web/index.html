@@ -422,7 +422,7 @@ syncThemeBtn();
       const mcSql=`(SELECT count(*) FROM matches m WHERE m.tournament_id=t.tournament_id AND m.winner_id IS NOT NULL AND m.loser_id IS NOT NULL)`;
       const rows=Q(`SELECT t.tournament_id,t.name,t.city,t.start_date,t.year,t.type_text,t.surface,t.court_type,c.name club_name,
         ${mcSql} match_count
-        FROM tournaments t LEFT JOIN clubs c ON c.club_id=t.club_id WHERE ${wc} AND ${mcSql}>0
+        FROM tournaments t LEFT JOIN clubs c ON c.club_id=t.club_id WHERE ${wc} AND (${mcSql}>0 OR t.source_tab='guncel')
         ORDER BY SUBSTR(REPLACE(t.start_date,' ',''),7,4)||SUBSTR(REPLACE(t.start_date,' ',''),4,2)||SUBSTR(REPLACE(t.start_date,' ',''),1,2) DESC,
           t.tournament_id DESC LIMIT ?`,[...p,...p,lim]);
       const years=Q('SELECT DISTINCT year FROM tournaments WHERE year IS NOT NULL ORDER BY year DESC').map(r=>r.year);

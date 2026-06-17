@@ -428,7 +428,7 @@ class Handler(BaseHTTPRequestHandler):
             SELECT t.tournament_id, t.name, t.city, t.start_date, t.year, t.type_text, t.surface, t.court_type,
                    c.name AS club_name, {mc_sql} AS match_count
             FROM tournaments t LEFT JOIN clubs c ON c.club_id=t.club_id
-            WHERE {' AND '.join(where)} AND {mc_sql}>0
+            WHERE {' AND '.join(where)} AND ({mc_sql}>0 OR t.source_tab='guncel')
             ORDER BY SUBSTR(REPLACE(t.start_date,' ',''),7,4)||SUBSTR(REPLACE(t.start_date,' ',''),4,2)||SUBSTR(REPLACE(t.start_date,' ',''),1,2) DESC,
                 t.tournament_id DESC LIMIT ?
         """
