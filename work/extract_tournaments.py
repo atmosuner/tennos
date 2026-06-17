@@ -17,14 +17,12 @@ OUTPUT = PROJECT_ROOT / "outputs" / "tournaments.json"
 TAB_KEYS = {
     "guncelturnuvalar": "guncel",
     "guncelturnuvalarpast": "gecmis",
-    "tenisligi": "gelisimLigi",
     "club18yasalti": "club18YasAlti",
 }
 
 TAB_LABELS = {
     "guncelturnuvalar": "Güncel",
     "guncelturnuvalarpast": "Geçmiş",
-    "tenisligi": "Gelişim Ligi",
     "club18yasalti": "18 Yaş Altı Türkiye Takımlar Şampiyonası",
 }
 

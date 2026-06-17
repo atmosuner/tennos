@@ -410,9 +410,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def api_tournaments(self, conn, q):
         where, params = ["1=1"], []
-        if q.get("liga"):
-            where.append("t.source_tab='gelisimLigi'")
-        elif q.get("include_ongoing"):
+        if q.get("include_ongoing"):
             where.append("t.source_tab IN ('gecmis','guncel')")
         else:
             where.append("t.source_tab='gecmis'")
@@ -425,10 +423,7 @@ class Handler(BaseHTTPRequestHandler):
         if q.get("age_group"):
             where.append("EXISTS(SELECT 1 FROM matches mx WHERE mx.tournament_id=t.tournament_id AND mx.age_group=?)"); params.append(int(q["age_group"]))
         limit = min(int(q.get("limit", 200)), 600)
-        if q.get("liga"):
-            mc_sql = "(SELECT count(*) FROM matches m WHERE m.tournament_id=t.tournament_id AND m.result_type IN ('completed','retirement','walkover'))"
-        else:
-            mc_sql = "(SELECT count(*) FROM matches m WHERE m.tournament_id=t.tournament_id AND m.winner_id IS NOT NULL AND m.loser_id IS NOT NULL)"
+        mc_sql = "(SELECT count(*) FROM matches m WHERE m.tournament_id=t.tournament_id AND m.winner_id IS NOT NULL AND m.loser_id IS NOT NULL)"
         sql = f"""
             SELECT t.tournament_id, t.name, t.city, t.start_date, t.year, t.type_text, t.surface, t.court_type,
                    c.name AS club_name, {mc_sql} AS match_count
