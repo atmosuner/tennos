@@ -1000,6 +1000,9 @@ async function renderCompare(a,b){
   const [da,db,hh,cm]=await Promise.all([pinfo(a),pinfo(b),api(`/h2h/${a}/${b}`),api(`/common/${a}/${b}`)]);
   const ra=da.rating||{}, rb=db.rating||{};
   const clubA=da.player||{}, clubAId=clubA.club_id, clubAName=clubA.club_name||ra.club_name||'';
+  const clubB=db.player||{}, clubBId=clubB.club_id, clubBName=clubB.club_name||rb.club_name||'';
+  const aName=ra.name||(da.player&&da.player.name)||('#'+a);
+  const bName2=rb.name||(db.player&&db.player.name)||('#'+b);
   const pct=r=>r.wins+r.losses?Math.round(r.wins/(r.wins+r.losses)*100):0;
   const bar=(va,vb,inv)=>{ // inv: lower better (rank)
     let pa=va+vb?va/(va+vb)*100:50; if(inv) pa=va+vb?vb/(va+vb)*100:50;
@@ -1034,14 +1037,15 @@ async function renderCompare(a,b){
     <div style="max-width:560px;margin:0 auto">${matches}</div>
     ${commonSection(cm,a,b)}
     <div id="clubOppSection"><p class="muted" style="text-align:center">yükleniyor…</p></div>`;
-  if(clubAId){
-    api('/club_opponents'+qs({player:b,club_id:clubAId})).then(co=>{
-      const el=document.getElementById('clubOppSection');
-      if(el) el.outerHTML=clubOpponentsSection(co,rb.name||db.player&&db.player.name||'#'+b,clubAName,a);
-    });
-  } else {
-    document.getElementById('clubOppSection').outerHTML='';
-  }
+  if(!clubAId&&!clubBId){document.getElementById('clubOppSection').outerHTML='';return;}
+  const fetches=[];
+  if(clubAId) fetches.push(api('/club_opponents'+qs({player:b,club_id:clubAId})).then(co=>({co,player:bName2,club:clubAName,clubOwner:aName,linkId:a})));
+  if(clubBId) fetches.push(api('/club_opponents'+qs({player:a,club_id:clubBId})).then(co=>({co,player:aName,club:clubBName,clubOwner:bName2,linkId:b})));
+  Promise.all(fetches).then(results=>{
+    const el=document.getElementById('clubOppSection');
+    if(!el) return;
+    el.outerHTML=results.map(r=>clubOpponentsSection(r.co,r.player,r.club,r.linkId,r.clubOwner)).join('');
+  });
 }
 
 function commonSection(cm,a,b){
@@ -1087,9 +1091,11 @@ function commonSection(cm,a,b){
     </div>`;
 }
 
-function clubOpponentsSection(co,bName,clubName,aId){
+function clubOpponentsSection(co,bName,clubName,aId,clubOwnerName){
   const bn=esc(bName.split(' ')[0]);
-  if(!co.opponents||!co.opponents.length) return `<h2 style="text-align:center">${esc(clubName)} Kulübü Maçları</h2><p class="muted" style="text-align:center">${bn}'un ${esc(clubName)} kulübü oyuncularına karşı maçı yok.</p>`;
+  const ownerTag=clubOwnerName?` <span class="tag">${esc(clubOwnerName.split(' ')[0])}'nın kulübü</span>`:'';
+  const title=`${esc(clubName)}${ownerTag}`;
+  if(!co.opponents||!co.opponents.length) return `<h2 style="text-align:center">${title}</h2><p class="muted" style="text-align:center">${bn}'un ${esc(clubName)} kulübü oyuncularına karşı maçı yok.</p>`;
   const mlines=ms=>ms.map(m=>`<div style="padding:6px 0;border-bottom:1px solid var(--line)">
     <div class="flex"><span class="badge ${m.won?'W':'L'}">${m.won?'G':'M'}</span><span class="score">${esc(m.score)||'<span class=muted>—</span>'}</span></div>
     <div class="tag" style="margin-top:3px">${esc(m.event||'')}${m.stage?' · '+esc(m.stage):''}<br>${m.tournamentId?`<a href="#/tournament/${m.tournamentId}">${esc(m.tournamentName||'turnuva')}</a> · `:''}${esc(m.date||'')}</div>
@@ -1107,8 +1113,8 @@ function clubOpponentsSection(co,bName,clubName,aId){
     return main+detail;}).join('');
   const total=co.opponents.reduce((s,o)=>s+o.w+o.l,0);
   const wins=co.opponents.reduce((s,o)=>s+o.w,0);
-  return `<h2 style="text-align:center">${esc(clubName)} Kulübü Maçları</h2>
-    <p class="sub" style="text-align:center">${bn}'un <a href="#/player/${aId}" style="color:inherit">${esc(clubName)}</a> kulübü oyuncularına karşı ${total} maç · ${wins} galibiyet <span class="tag">· satıra tıkla detay</span></p>
+  return `<h2 style="text-align:center">${title}</h2>
+    <p class="sub" style="text-align:center"><b>${bn}</b>'un <a href="#/player/${aId}" style="color:inherit">${esc(clubName)}</a> kulübü oyuncularına karşı ${total} maç · ${wins} galibiyet <span class="tag">· satıra tıkla detay</span></p>
     <div style="max-width:560px;margin:0 auto">
       <table><thead><tr><th>Rakip</th><th style="text-align:center">${bn}</th><th style="text-align:center">Toplam</th></tr></thead>
       <tbody>${rows}</tbody></table>
