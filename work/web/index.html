@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Tennos — Junior Tenis Analitik</title>
+<title>Kortex — Junior Tenis Analitik</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -50,9 +50,8 @@
   .brand{display:flex;align-items:center;gap:9px;font-family:var(--font-disp);font-weight:800;
     font-size:22px;letter-spacing:-.04em;color:var(--txt);padding:2px 8px;margin-bottom:24px}
   .brand:hover{color:var(--txt)}
-  .brand .ball{width:13px;height:13px;border-radius:50%;background:var(--accent);
-    box-shadow:0 0 0 3px var(--accent-soft);flex:none}
-  .brand .os{color:var(--accent-ink)}
+  .brand .logo-mark{width:26px;height:26px;flex:none}
+  .brand .ex{color:var(--accent-ink)}
   #nav{display:flex;flex-direction:column;gap:3px}
   #nav a{position:relative;display:flex;align-items:center;gap:10px;color:var(--dim);font-weight:600;
     font-size:14.5px;padding:9px 12px;border-radius:10px;letter-spacing:-.01em}
@@ -227,7 +226,7 @@
 <body>
 <div class="app-shell">
   <aside class="sidebar">
-    <a class="brand" href="#/"><span class="ball"></span><span>Tenn<span class="os">os</span></span></a>
+    <a class="brand" href="#/"><svg class="logo-mark" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M13 2L23 7.5V18.5L13 24L3 18.5V7.5Z" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.6" stroke-linejoin="round"/><line x1="3" y1="13" x2="23" y2="13" stroke="var(--accent)" stroke-width="1.1" opacity=".6"/><path d="M9 8.5v9M9 13l5-4.5M9 13l5 4.5" stroke="var(--accent-ink)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Kort<span class="ex">ex</span></span></a>
     <nav id="nav">
       <a href="#/">Özet</a>
       <a href="#/rankings">Sıralama</a>
@@ -243,7 +242,7 @@
   </aside>
   <div class="main-col">
     <header class="topbar">
-      <a class="brand brand--mobile" href="#/"><span class="ball"></span><span>Tenn<span class="os">os</span></span></a>
+      <a class="brand brand--mobile" href="#/"><svg class="logo-mark" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M13 2L23 7.5V18.5L13 24L3 18.5V7.5Z" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.6" stroke-linejoin="round"/><line x1="3" y1="13" x2="23" y2="13" stroke="var(--accent)" stroke-width="1.1" opacity=".6"/><path d="M9 8.5v9M9 13l5-4.5M9 13l5 4.5" stroke="var(--accent-ink)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Kort<span class="ex">ex</span></span></a>
       <div class="search">
         <input id="q" placeholder="Oyuncu / kulüp ara…" autocomplete="off">
         <div class="results" id="sr"></div>
