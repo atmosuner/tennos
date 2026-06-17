@@ -416,6 +416,8 @@ class Handler(BaseHTTPRequestHandler):
             where.append("t.city=?"); params.append(q["city"])
         if q.get("year"):
             where.append("t.year=?"); params.append(int(q["year"]))
+        if q.get("age_group"):
+            where.append("EXISTS(SELECT 1 FROM matches mx WHERE mx.tournament_id=t.tournament_id AND mx.age_group=?)"); params.append(int(q["age_group"]))
         limit = min(int(q.get("limit", 200)), 600)
         sql = f"""
             SELECT t.tournament_id, t.name, t.city, t.start_date, t.year, t.type_text, t.surface, t.court_type,
@@ -423,11 +425,16 @@ class Handler(BaseHTTPRequestHandler):
                    (SELECT count(*) FROM matches m WHERE m.tournament_id=t.tournament_id AND m.winner_id IS NOT NULL AND m.loser_id IS NOT NULL) AS match_count
             FROM tournaments t LEFT JOIN clubs c ON c.club_id=t.club_id
             WHERE {' AND '.join(where)}
-            ORDER BY (match_count>0) DESC, t.year DESC, t.tournament_id DESC LIMIT ?
+            ORDER BY (match_count>0) DESC,
+                SUBSTR(REPLACE(t.start_date,' ',''),7,4)||SUBSTR(REPLACE(t.start_date,' ',''),4,2)||SUBSTR(REPLACE(t.start_date,' ',''),1,2) DESC,
+                t.tournament_id DESC LIMIT ?
         """
         rows = rows_to_dicts(conn.execute(sql, (*params, limit)).fetchall())
+        if not q.get("include_ongoing"):
+            rows = [r for r in rows if r["match_count"] > 0]
         years = [r[0] for r in conn.execute("SELECT DISTINCT year FROM tournaments WHERE year IS NOT NULL ORDER BY year DESC").fetchall()]
-        return {"total": len(rows), "years": years, "tournaments": rows}
+        age_groups = [r[0] for r in conn.execute("SELECT DISTINCT age_group FROM matches WHERE age_group IS NOT NULL ORDER BY age_group").fetchall()]
+        return {"total": len(rows), "years": years, "age_groups": age_groups, "tournaments": rows}
 
     def api_tournament(self, conn, tid):
         t = conn.execute("SELECT * FROM tournaments WHERE tournament_id=?", (tid,)).fetchone()
