@@ -797,7 +797,7 @@ async function tournaments(params){
     <table><thead><tr><th>Turnuva</th><th>Tarih</th><th>Şehir</th><th>Kulüp</th><th>Maç</th></tr></thead><tbody>
     ${d.tournaments.map(t=>`<tr>
       <td><a href="#/tournament/${t.tournament_id}">${esc(t.name)}</a></td>
-      <td class="muted">${esc((t.start_date||'').replace(/\s*\(\d+\)/,''))}</td>
+      <td class="muted">${esc((t.start_date||'').replace(/\s*\(\d+\).*/,'').trim().replace(/-/g,'.'))}</td>
       <td class="muted">${esc(t.city||'')}</td>
       <td class="muted">${esc(t.club_name||'')}</td>
       <td>${t.match_count||0}</td></tr>`).join('')}
