@@ -418,7 +418,7 @@ syncThemeBtn();
       if(q.city){w.push('t.city=?');p.push(q.city);}
       if(q.year){w.push('t.year=?');p.push(+q.year);}
       if(q.age_group){w.push('EXISTS(SELECT 1 FROM matches mx WHERE mx.tournament_id=t.tournament_id AND mx.age_group=?)');p.push(+q.age_group);}
-      const lim=Math.min(+(q.limit||200),600),wc=w.join(' AND ');
+      const lim=Math.min(+(q.limit||700),700),wc=w.join(' AND ');
       const mcSql=`(SELECT count(*) FROM matches m WHERE m.tournament_id=t.tournament_id AND m.winner_id IS NOT NULL AND m.loser_id IS NOT NULL)`;
       const rows=Q(`SELECT t.tournament_id,t.name,t.city,t.start_date,t.year,t.type_text,t.surface,t.court_type,c.name club_name,
         ${mcSql} match_count
@@ -788,7 +788,7 @@ async function tournaments(params){
       <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:14px;color:var(--txt2);white-space:nowrap"><input type="checkbox" id="tOngoing" ${incl?'checked':''}> Güncel turnuvaları da göster</label>
     </div>
     <div id="tl" class="loading">…</div>`;
-  const d=await api('/tournaments'+qs({year:yr,q:term,age_group:ag,include_ongoing:incl,limit:400}));
+  const d=await api('/tournaments'+qs({year:yr,q:term,age_group:ag,include_ongoing:incl,limit:700}));
   $('#tYear').innerHTML='<option value="">Tüm Yıllar</option>'+d.years.map(y=>`<option value="${y}" ${y==yr?'selected':''}>${y}</option>`).join('');
   $('#tAg').innerHTML='<option value="">Tüm Yaş Grupları</option>'+(d.age_groups||[]).map(a=>`<option value="${a}" ${a==ag?'selected':''}>${a} Yaş</option>`).join('');
   $('#tYear').onchange=nav; $('#tAg').onchange=nav; $('#tOngoing').onchange=nav;

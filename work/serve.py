@@ -422,7 +422,7 @@ class Handler(BaseHTTPRequestHandler):
             where.append("t.year=?"); params.append(int(q["year"]))
         if q.get("age_group"):
             where.append("EXISTS(SELECT 1 FROM matches mx WHERE mx.tournament_id=t.tournament_id AND mx.age_group=?)"); params.append(int(q["age_group"]))
-        limit = min(int(q.get("limit", 200)), 600)
+        limit = min(int(q.get("limit", 700)), 700)
         mc_sql = "(SELECT count(*) FROM matches m WHERE m.tournament_id=t.tournament_id AND m.winner_id IS NOT NULL AND m.loser_id IS NOT NULL)"
         sql = f"""
             SELECT t.tournament_id, t.name, t.city, t.start_date, t.year, t.type_text, t.surface, t.court_type,
