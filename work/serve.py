@@ -185,6 +185,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(self.api_clubs(conn, q))
             elif path == "/api/search":
                 self.send_json(self.api_search(conn, q))
+            elif path == "/api/club_opponents":
+                self.send_json(self.api_club_opponents(conn, q))
             else:
                 self.send_json({"error": "not found"}, status=404)
         finally:
@@ -502,6 +504,38 @@ class Handler(BaseHTTPRequestHandler):
             ORDER BY player_count DESC LIMIT ?
         """
         return {"clubs": rows_to_dicts(conn.execute(sql, (*params, limit)).fetchall())}
+
+    def api_club_opponents(self, conn, q):
+        pid = int(q.get("player", 0) or 0)
+        cid = int(q.get("club_id", 0) or 0)
+        if not pid or not cid:
+            return {"opponents": []}
+        rows = conn.execute(
+            """SELECT m.match_id, m.match_date, m.event, m.stage, m.winner_id, m.loser_id, m.p1_id,
+                      m.tournament_id, t.name AS tournament_name,
+                      opp.player_id AS opp_id, opp.name AS opp_name
+               FROM matches m
+               LEFT JOIN tournaments t ON t.tournament_id=m.tournament_id
+               JOIN players opp ON opp.player_id=CASE WHEN m.winner_id=? THEN m.loser_id ELSE m.winner_id END
+               WHERE (m.winner_id=? OR m.loser_id=?) AND m.winner_id IS NOT NULL AND m.loser_id IS NOT NULL
+                 AND opp.club_id=?
+               ORDER BY SUBSTR(REPLACE(m.match_date,' ',''),7,4)||SUBSTR(REPLACE(m.match_date,' ',''),4,2)||SUBSTR(REPLACE(m.match_date,' ',''),1,2) DESC""",
+            (pid, pid, pid, cid),
+        ).fetchall()
+        by_opp: dict = {}
+        for r in rows:
+            oid = r["opp_id"]
+            if oid not in by_opp:
+                by_opp[oid] = {"oppId": oid, "oppName": r["opp_name"], "w": 0, "l": 0, "matches": []}
+            won = r["winner_id"] == pid
+            by_opp[oid]["w" if won else "l"] += 1
+            by_opp[oid]["matches"].append({
+                "date": r["match_date"], "event": r["event"], "stage": r["stage"], "won": won,
+                "score": build_score(conn, r["match_id"], r["p1_id"] == pid),
+                "tournamentId": r["tournament_id"], "tournamentName": r["tournament_name"],
+            })
+        opponents = sorted(by_opp.values(), key=lambda x: x["w"] + x["l"], reverse=True)
+        return {"opponents": opponents}
 
     def api_search(self, conn, q):
         term = q.get("q", "").strip()
