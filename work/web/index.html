@@ -431,14 +431,15 @@ syncThemeBtn();
       if(q.birth_year){w.push('p.birth_year=?');p.push(+q.birth_year);}
       if(q.city){w.push('p.city=?');p.push(q.city);}
       if(q.club_id){w.push('p.club_id=?');p.push(+q.club_id);}
-      if(q.rated==='1') w.push('pr.player_id IS NOT NULL');
+      if(q.age_group){w.push('pr.age_group=?');p.push(+q.age_group);}
       const lim=Math.min(+(q.limit||50),200),off=+(q.offset||0),wc=w.join(' AND ');
       const rows=Q(`SELECT p.player_id,p.name,p.birth_year,p.gender,p.club_id,p.club_name,p.city,pr.rating,pr.matches,pr.age_group
         FROM players p LEFT JOIN player_ratings pr ON pr.player_id=p.player_id WHERE ${wc}
         ORDER BY (pr.rating IS NULL), pr.rating DESC, p.name LIMIT ? OFFSET ?`,[...p,lim,off]);
       const total=scalar(`SELECT count(*) FROM players p LEFT JOIN player_ratings pr ON pr.player_id=p.player_id WHERE ${wc}`,p);
       const years=Q('SELECT DISTINCT birth_year FROM players WHERE birth_year IS NOT NULL ORDER BY birth_year').map(r=>r.birth_year);
-      return {total,limit:lim,offset:off,years,players:rows};
+      const age_groups=Q('SELECT DISTINCT age_group FROM player_ratings WHERE age_group IS NOT NULL ORDER BY age_group').map(r=>r.age_group);
+      return {total,limit:lim,offset:off,years,age_groups,players:rows};
     },
     tournaments(q){
       const w=['1=1'],p=[];
@@ -922,32 +923,59 @@ async function rankingsClub(cid){
 
 // ---------- Players directory ----------
 async function players_dir(params){
-  const gn=params.gender||'', by=params.birth_year||'', term=params.q||'', rated=params.rated||'';
+  const gn=params.gender||'', by=params.birth_year||'', term=params.q||'', ag=params.age_group||'';
+  const cid=params.club_id||'', cn=params.club_name||'';
   const page=Math.max(1,parseInt(params.page||'1')), limit=50, offset=(page-1)*limit;
   app().innerHTML=`<h1>Oyuncular</h1>
     <div class="filters">
       <input id="pQ" value="${esc(term)}" placeholder="isim ara…" style="background:var(--panel2);border:1px solid var(--line);color:var(--txt);padding:8px 12px;border-radius:8px;outline:none;font-size:16px">
       <select id="pGen"><option value="">Tüm Cinsiyet</option><option value="Erkek" ${gn=='Erkek'?'selected':''}>Erkek</option><option value="Kadın" ${gn=='Kadın'?'selected':''}>Kadın</option></select>
       <select id="pYear"><option value="">Tüm Doğum Yılı</option></select>
-      <select id="pRated"><option value="">Tümü</option><option value="1" ${rated=='1'?'selected':''}>Sadece reytingli</option></select>
+      <select id="pAg"><option value="">Tüm Kategori</option></select>
+      <div id="pClub" style="position:relative"></div>
     </div>
     <div id="pl" class="loading">…</div>`;
-  const d=await api('/players'+qs({q:term,gender:gn,birth_year:by,rated:rated,limit,offset}));
+  const d=await api('/players'+qs({q:term,gender:gn,birth_year:by,age_group:ag,club_id:cid,limit,offset}));
   $('#pYear').innerHTML='<option value="">Tüm Doğum Yılı</option>'+d.years.map(y=>`<option value="${y}" ${y==by?'selected':''}>${y}</option>`).join('');
-  const nav=()=>location.hash='#/players'+qs({q:$('#pQ').value,gender:$('#pGen').value,birth_year:$('#pYear').value,rated:$('#pRated').value});
-  $('#pGen').onchange=nav; $('#pYear').onchange=nav; $('#pRated').onchange=nav;
+  $('#pAg').innerHTML='<option value="">Tüm Kategori</option>'+(d.age_groups||[]).map(a=>`<option value="${a}" ${a==ag?'selected':''}>${a} Yaş</option>`).join('');
+  const nav=()=>location.hash='#/players'+qs({q:$('#pQ').value,gender:$('#pGen').value,birth_year:$('#pYear').value,age_group:$('#pAg').value,club_id:cid,club_name:cn});
+  $('#pGen').onchange=nav; $('#pYear').onchange=nav; $('#pAg').onchange=nav;
   let t;$('#pQ').oninput=e=>{clearTimeout(t);t=setTimeout(nav,350);};
+  // club picker
+  const pClub=$('#pClub');
+  const renderClubPicker=()=>{
+    if(cid&&cn){
+      pClub.innerHTML=`<div class="picked" style="white-space:nowrap"><b>${esc(cn)}</b><span class="x" title="kaldır" style="cursor:pointer;margin-left:6px">✕</span></div>`;
+      pClub.querySelector('.x').onclick=()=>{location.hash='#/players'+qs({q:$('#pQ').value,gender:$('#pGen').value,birth_year:$('#pYear').value});};
+    } else {
+      pClub.innerHTML=`<div class="picker"><input placeholder="kulüp ara…" autocomplete="off" style="background:var(--panel2);border:1px solid var(--line);color:var(--txt);padding:8px 12px;border-radius:8px;outline:none;font-size:16px"><div class="results"></div></div>`;
+      const inp=pClub.querySelector('input'),res=pClub.querySelector('.results');
+      let tc;inp.oninput=()=>{clearTimeout(tc);const v=inp.value.trim();
+        if(v.length<2){res.classList.remove('show');return;}
+        tc=setTimeout(async()=>{const s=await api('/search'+qs({q:v}));
+          res.innerHTML=s.clubs.length?s.clubs.map(c=>`<div class="r" data-id="${c.club_id}" data-name="${esc(c.name)}">${esc(c.name)}<span class="muted" style="margin-left:6px;font-size:12px">${esc(c.city||'')}</span></div>`).join(''):'<div class="r muted">sonuç yok</div>';
+          res.classList.add('show');
+          res.querySelectorAll('.r[data-id]').forEach(el=>el.onclick=()=>{
+            location.hash='#/players'+qs({q:$('#pQ').value,gender:$('#pGen').value,birth_year:$('#pYear').value,club_id:el.dataset.id,club_name:el.dataset.name});
+          });
+        },200);
+      };
+      inp.onblur=()=>setTimeout(()=>res.classList.remove('show'),200);
+    }
+  };
+  renderClubPicker();
   const pages=Math.ceil(d.total/limit);
   const pager=(()=>{
-    const mk=(p,lbl,dis)=>dis?`<span class="btn" style="opacity:.4">${lbl}</span>`:`<a class="btn" href="#/players${qs({q:term,gender:gn,birth_year:by,rated:rated,page:p})}">${lbl}</a>`;
+    const mk=(p,lbl,dis)=>dis?`<span class="btn" style="opacity:.4">${lbl}</span>`:`<a class="btn" href="#/players${qs({q:term,gender:gn,birth_year:by,age_group:ag,club_id:cid,club_name:cn,page:p})}">${lbl}</a>`;
     return `<div class="flex" style="margin:14px 0;justify-content:center;gap:12px">
       ${mk(page-1,'‹ Önceki',page<=1)}<span class="muted">${page} / ${pages||1}</span>${mk(page+1,'Sonraki ›',page>=pages)}</div>`;})();
   $('#pl').outerHTML=`<div id="pl"><p class="muted" style="margin:0 0 10px">${d.total.toLocaleString('tr')} oyuncu</p>
-    <table><thead><tr><th></th><th onclick="sortTable(this)" style="cursor:pointer">Oyuncu</th><th onclick="sortTable(this)" style="cursor:pointer">Doğum</th><th onclick="sortTable(this)" style="cursor:pointer">Cinsiyet</th><th onclick="sortTable(this)" style="cursor:pointer">Kulüp</th><th onclick="sortTable(this)" style="cursor:pointer">Şehir</th><th onclick="sortTable(this)" style="cursor:pointer">Reyting</th></tr></thead><tbody>
+    <table><thead><tr><th></th><th onclick="sortTable(this)" style="cursor:pointer">Oyuncu</th><th onclick="sortTable(this)" style="cursor:pointer">Doğum</th><th onclick="sortTable(this)" style="cursor:pointer">Kategori</th><th onclick="sortTable(this)" style="cursor:pointer">Cinsiyet</th><th onclick="sortTable(this)" style="cursor:pointer">Kulüp</th><th onclick="sortTable(this)" style="cursor:pointer">Şehir</th><th onclick="sortTable(this)" style="cursor:pointer">Reyting</th></tr></thead><tbody>
     ${d.players.map(p=>{const inSlot=cmpSlots.some(s=>s&&s.id===String(p.player_id));return`<tr>
       <td style="padding:0 4px"><button class="cmp-btn ${inSlot?'in-slot':''}" data-pid="${p.player_id}" data-name="${esc(p.name)}" onclick="addToCmp(this.dataset.pid,this.dataset.name)" title="Karşılaştırmaya ekle">${inSlot?'✓':'⇄'}</button></td>
       <td><a href="#/player/${p.player_id}">${esc(p.name)}</a></td>
       <td class="muted">${p.birth_year||'—'}</td>
+      <td>${ageP(p.age_group)}</td>
       <td>${genderP(p.gender)}</td>
       <td class="muted">${esc(p.club_name||'')}</td>
       <td class="muted">${esc(p.city||'')}</td>
