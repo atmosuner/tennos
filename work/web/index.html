@@ -424,7 +424,7 @@ syncThemeBtn();
         ${mcSql} match_count
         FROM tournaments t LEFT JOIN clubs c ON c.club_id=t.club_id WHERE ${wc} AND (${mcSql}>0 OR t.source_tab='guncel')
         ORDER BY SUBSTR(REPLACE(t.start_date,' ',''),7,4)||SUBSTR(REPLACE(t.start_date,' ',''),4,2)||SUBSTR(REPLACE(t.start_date,' ',''),1,2) DESC,
-          t.tournament_id DESC LIMIT ?`,[...p,...p,lim]);
+          t.tournament_id DESC LIMIT ?`,[...p,lim]);
       const years=Q('SELECT DISTINCT year FROM tournaments WHERE year IS NOT NULL ORDER BY year DESC').map(r=>r.year);
       const age_groups=Q('SELECT DISTINCT age_group FROM matches WHERE age_group IS NOT NULL ORDER BY age_group').map(r=>r.age_group);
       return {total:rows.length,years,age_groups,tournaments:rows};

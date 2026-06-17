@@ -432,7 +432,7 @@ class Handler(BaseHTTPRequestHandler):
             ORDER BY SUBSTR(REPLACE(t.start_date,' ',''),7,4)||SUBSTR(REPLACE(t.start_date,' ',''),4,2)||SUBSTR(REPLACE(t.start_date,' ',''),1,2) DESC,
                 t.tournament_id DESC LIMIT ?
         """
-        rows = rows_to_dicts(conn.execute(sql, (*params, *params, limit)).fetchall())
+        rows = rows_to_dicts(conn.execute(sql, (*params, limit)).fetchall())
         years = [r[0] for r in conn.execute("SELECT DISTINCT year FROM tournaments WHERE year IS NOT NULL ORDER BY year DESC").fetchall()]
         age_groups = [r[0] for r in conn.execute("SELECT DISTINCT age_group FROM matches WHERE age_group IS NOT NULL ORDER BY age_group").fetchall()]
         return {"total": len(rows), "years": years, "age_groups": age_groups, "tournaments": rows}
