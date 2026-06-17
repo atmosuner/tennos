@@ -325,6 +325,16 @@ syncThemeBtn();
     }
     return parts.join(' ');
   }
+  function buildSetScore(mid,firstIsWinner){
+    const sets=Q('SELECT p1_games,p2_games FROM sets WHERE match_id=? ORDER BY set_number',[mid]);
+    let w=0,l=0;
+    for(const s of sets){
+      const wg=firstIsWinner?s.p1_games:s.p2_games,lg=firstIsWinner?s.p2_games:s.p1_games;
+      if(wg==null&&lg==null)continue;
+      if((wg||0)>(lg||0))w++;else if((lg||0)>(wg||0))l++;
+    }
+    return w+l>0?`${w}-${l}`:'';
+  }
   const dkey=s=>{const m=/(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{4})/.exec(s||'');return m?(+m[3])*1e4+(+m[2])*100+(+m[1]):0;};
 
   function playerMatches(pid){
@@ -531,7 +541,7 @@ syncThemeBtn();
         byGender[g].total++;
         if(aw)byGender[g].aWins++;else byGender[g].bWins++;
       }
-      const matches=rows.map(r=>({...r,score:buildScore(r.match_id,r.winner_id===r.p1_id)}));
+      const matches=rows.map(r=>({...r,score:buildSetScore(r.match_id,r.winner_id===r.p1_id)}));
       return {matches,aWins,bWins,total:matches.length,byGender};
     }
   };
@@ -1077,7 +1087,7 @@ async function renderClubCompare(a,b,an,bn){
     const info=[m.tournament_name,m.event,m.stage,m.match_date].filter(Boolean).join(' · ');
     const ti=info?(m.tournament_id?`<a href="#/tournament/${m.tournament_id}" class="sc-ic" title="${esc(info)}" style="font-style:italic">i</a>`:`<span class="sc-ic" title="${esc(info)}" style="font-style:italic;cursor:help">i</span>`):'';
     return `<div class="matchline">
-      <span class="badge W">${esc(aWon?an.split(' ')[0]:bn.split(' ')[0])}</span>
+      <span class="badge" style="background:${aWon?'var(--accent)':'var(--accent2)'};color:#fff">${esc(aWon?an.split(' ')[0]:bn.split(' ')[0])}</span>
       <span><b><a href="#/player/${m.winner_id}">${esc(m.winner_name)}</a></b> · <a href="#/player/${m.loser_id}" class="muted">${esc(m.loser_name)}</a></span>
       <span style="margin-left:auto;display:flex;gap:4px;align-items:center;flex-shrink:0">${sc}${ti}</span>
     </div>`;};
