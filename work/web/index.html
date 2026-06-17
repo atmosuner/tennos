@@ -348,6 +348,7 @@ syncThemeBtn();
       if(q.age_group){w.push('pr.age_group=?');p.push(+q.age_group);}
       if(q.club_id){w.push('pr.club_id=?');p.push(+q.club_id);}
       if(q.gender){w.push('pr.gender=?');p.push(q.gender);}
+      if(q.birth_year){w.push('pr.birth_year=?');p.push(+q.birth_year);}
       if(q.q){w.push(foldsql('pr.name')+' LIKE ?');p.push('%'+fold(q.q)+'%');}
       const mm=q.min_matches!=null?+q.min_matches:5; w.push('pr.matches>=?');p.push(mm);
       const lim=Math.min(+(q.limit||50),500), off=+(q.offset||0);
@@ -359,7 +360,8 @@ syncThemeBtn();
       const rows=Q(`SELECT pr.*,p.gender pgender,p.city player_city${agSel} FROM player_ratings pr LEFT JOIN players p ON p.player_id=pr.player_id WHERE ${wc} ORDER BY ${ord} LIMIT ? OFFSET ?`,[...p,lim,off]);
       if(q.age_group) rows.forEach(r=>{r.wins=r.ag_wins;r.losses=r.ag_losses;});
       const total=scalar(`SELECT count(*) FROM player_ratings pr LEFT JOIN players p ON p.player_id=pr.player_id WHERE ${wc}`,p);
-      return {total,limit:lim,offset:off,rankings:rows};
+      const years=Q('SELECT DISTINCT birth_year FROM player_ratings WHERE birth_year IS NOT NULL ORDER BY birth_year').map(r=>r.birth_year);
+      return {total,limit:lim,offset:off,years,rankings:rows};
     },
     player(id){
       id=+id; const rating=one('SELECT * FROM player_ratings WHERE player_id=?',[id]);
@@ -571,23 +573,54 @@ function rankTable(rows, rankField){
 
 // ---------- Rankings ----------
 async function rankings(params){
-  const ag=params.age_group||'', gn=params.gender||'';
+  // kat = "12_Erkek" style; fall back to legacy age_group+gender params
+  const kat=params.kat||(params.age_group&&params.gender?params.age_group+'_'+params.gender:'');
+  const [ag,gn]=kat?kat.split('_'):[(params.age_group||''),(params.gender||'')];
+  const by=params.birth_year||'', cid=params.club_id||'', cnm=params.club_name||'';
   const limit=50, page=Math.max(1,parseInt(params.page||'1')), offset=(page-1)*limit;
+  const katOpts=['',...[8,9,10,12,14].flatMap(a=>['Erkek','Kadın'].map(g=>`${a}_${g}`))];
+  const katLabel=k=>k?(k.split('_')[0]+' Yaş '+k.split('_')[1]):'Tüm Kategoriler';
   app().innerHTML=`
     <h1>Sıralama</h1>
     <div class="filters">
-      <select id="fAge"><option value="">Tüm Yaşlar</option>${[8,9,10,12,14].map(a=>`<option value="${a}" ${a==ag?'selected':''}>${a} Yaş</option>`).join('')}</select>
-      <select id="fGen"><option value="">Tüm Cinsiyet</option><option value="Erkek" ${gn=='Erkek'?'selected':''}>Erkek</option><option value="Kadın" ${gn=='Kadın'?'selected':''}>Kadın</option></select>
+      <select id="fKat">${katOpts.map(k=>`<option value="${k}" ${k===kat?'selected':''}>${katLabel(k)}</option>`).join('')}</select>
+      <select id="fYear"><option value="">Tüm Doğum Yılları</option></select>
+      <div class="picker" style="position:relative;flex:1;min-width:140px">
+        <input id="fClub" placeholder="kulüp ara…" autocomplete="off" value="${esc(cnm)}" style="width:100%;font-size:16px">
+        <div class="results" id="fClubRes"></div>
+      </div>
     </div>
     <div id="rk" class="loading">…</div>`;
-  const apply=()=>{const a=$('#fAge').value,g=$('#fGen').value;
-    location.hash='#/rankings'+qs({age_group:a,gender:g});};
-  $('#fAge').onchange=apply; $('#fGen').onchange=apply;
-  const r=await api('/rankings'+qs({age_group:ag,gender:gn,limit,offset}));
+  let _cid=cid, _cnm=cnm;
+  const nav=(newCid,newCnm)=>{
+    if(newCid!==undefined){_cid=newCid;_cnm=newCnm||'';}
+    location.hash='#/rankings'+qs({kat:$('#fKat').value,birth_year:$('#fYear').value,club_id:_cid,club_name:_cnm});
+  };
+  $('#fKat').onchange=()=>nav();
+  $('#fYear').onchange=()=>nav();
+  const clubInp=$('#fClub'), clubRes=$('#fClubRes');
+  let ct;
+  clubInp.oninput=()=>{
+    clearTimeout(ct); _cid=''; _cnm='';
+    const v=clubInp.value.trim();
+    if(v.length<2){clubRes.classList.remove('show');return;}
+    ct=setTimeout(async()=>{
+      const d=await api('/search'+qs({q:v}));
+      clubRes.innerHTML=d.clubs.length?d.clubs.map(c=>`<div class="r" data-id="${c.club_id}" data-name="${esc(c.name)}">${esc(c.name)}<span class="muted" style="margin-left:6px;font-size:12px">${esc(c.city||'')}</span></div>`).join(''):'<div class="r muted">sonuç yok</div>';
+      clubRes.classList.add('show');
+      clubRes.querySelectorAll('.r[data-id]').forEach(el=>el.onclick=()=>{
+        clubInp.value=el.dataset.name; clubRes.classList.remove('show'); nav(el.dataset.id,el.dataset.name);
+      });
+    },200);
+  };
+  clubInp.onblur=()=>setTimeout(()=>clubRes.classList.remove('show'),200);
+  const r=await api('/rankings'+qs({age_group:ag,gender:gn,birth_year:by,club_id:cid,limit,offset}));
+  $('#fYear').innerHTML='<option value="">Tüm Doğum Yılları</option>'+(r.years||[]).map(y=>`<option value="${y}" ${y==by?'selected':''}>${y}</option>`).join('');
   const rankField=ag?'age_group_rank':(gn?'gender_rank':'overall_rank');
-  const label=(ag?ag+' Yaş ':'')+(gn||'')||'Genel';
+  const labelParts=[kat?katLabel(kat):'',by?by+' doğumlu':'',cnm].filter(Boolean);
+  const label=labelParts.join(' · ')||'Genel';
   const pages=Math.ceil(r.total/limit);
-  const mk=(p,lbl,dis)=>dis?`<span class="btn" style="opacity:.4">${lbl}</span>`:`<a class="btn" href="#/rankings${qs({age_group:ag,gender:gn,page:p})}">${lbl}</a>`;
+  const mk=(p,lbl,dis)=>dis?`<span class="btn" style="opacity:.4">${lbl}</span>`:`<a class="btn" href="#/rankings${qs({kat,birth_year:by,club_id:cid,club_name:cnm,page:p})}">${lbl}</a>`;
   const pager=pages>1?`<div class="flex" style="margin:14px 0;justify-content:center;gap:12px">${mk(page-1,'‹ Önceki',page<=1)}<span class="muted">${page} / ${pages}</span>${mk(page+1,'Sonraki ›',page>=pages)}</div>`:'';
   $('#rk').outerHTML=`<div id="rk"><p class="muted" style="margin:0 0 10px">${esc(label)} · ${r.total.toLocaleString('tr')} oyuncu · min 5 maç</p>${rankTable(r.rankings,rankField)}${pager}</div>`;
 }

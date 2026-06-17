@@ -216,6 +216,8 @@ class Handler(BaseHTTPRequestHandler):
             where.append("pr.club_id=?"); params.append(int(q["club_id"]))
         if q.get("gender"):
             where.append("pr.gender=?"); params.append(q["gender"])
+        if q.get("birth_year"):
+            where.append("pr.birth_year=?"); params.append(int(q["birth_year"]))
         if q.get("q"):
             where.append(f"{foldsql('pr.name')} LIKE ?"); params.append(f"%{fold(q['q'])}%")
         min_matches = int(q.get("min_matches", 5))
@@ -247,7 +249,8 @@ class Handler(BaseHTTPRequestHandler):
             f"SELECT count(*) FROM player_ratings pr LEFT JOIN players p ON p.player_id=pr.player_id WHERE {' AND '.join(where)}",
             params,
         ).fetchone()[0]
-        return {"total": total, "limit": limit, "offset": offset, "rankings": rows}
+        years = [r[0] for r in conn.execute("SELECT DISTINCT birth_year FROM player_ratings WHERE birth_year IS NOT NULL ORDER BY birth_year").fetchall()]
+        return {"total": total, "limit": limit, "offset": offset, "years": years, "rankings": rows}
 
     def api_player(self, conn, pid):
         rating = conn.execute("SELECT * FROM player_ratings WHERE player_id=?", (pid,)).fetchone()
