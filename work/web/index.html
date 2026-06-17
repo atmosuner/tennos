@@ -541,7 +541,7 @@ function renderCmpBar(){
   const bar=document.getElementById('cmpBar');
   const inner=bar.querySelector('.cmp-bar-inner');
   const any=cmpSlots.some(s=>s);
-  bar.style.display=any?'':'none';
+  bar.style.display=any?'block':'none';
   if(!any)return;
   const[a,b]=cmpSlots;
   const sh=s=>s?`<span class="cmp-slot">${esc(s.name.split(' ')[0])}<span class="cmp-x" onclick="addToCmp('${s.id}','')">&#x2715;</span></span>`:`<span class="cmp-slot-empty">bo&#351;&#8230;</span>`;
