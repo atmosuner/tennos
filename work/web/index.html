@@ -420,12 +420,14 @@ syncThemeBtn();
       if(q.year){w.push('t.year=?');p.push(+q.year);}
       if(q.age_group){w.push('EXISTS(SELECT 1 FROM matches mx WHERE mx.tournament_id=t.tournament_id AND mx.age_group=?)');p.push(+q.age_group);}
       const lim=Math.min(+(q.limit||200),600),wc=w.join(' AND ');
-      let rows=Q(`SELECT t.tournament_id,t.name,t.city,t.start_date,t.year,t.type_text,t.surface,t.court_type,c.name club_name,
-        (SELECT count(*) FROM matches m WHERE m.tournament_id=t.tournament_id AND m.winner_id IS NOT NULL AND m.loser_id IS NOT NULL) match_count
-        FROM tournaments t LEFT JOIN clubs c ON c.club_id=t.club_id WHERE ${wc}
+      const mcSql=q.liga
+        ? `(SELECT count(*) FROM matches m WHERE m.tournament_id=t.tournament_id AND m.result_type IN ('completed','retirement','walkover'))`
+        : `(SELECT count(*) FROM matches m WHERE m.tournament_id=t.tournament_id AND m.winner_id IS NOT NULL AND m.loser_id IS NOT NULL)`;
+      const rows=Q(`SELECT t.tournament_id,t.name,t.city,t.start_date,t.year,t.type_text,t.surface,t.court_type,c.name club_name,
+        ${mcSql} match_count
+        FROM tournaments t LEFT JOIN clubs c ON c.club_id=t.club_id WHERE ${wc} AND ${mcSql}>0
         ORDER BY SUBSTR(REPLACE(t.start_date,' ',''),7,4)||SUBSTR(REPLACE(t.start_date,' ',''),4,2)||SUBSTR(REPLACE(t.start_date,' ',''),1,2) DESC,
-          t.tournament_id DESC LIMIT ?`,[...p,lim]);
-      rows=rows.filter(r=>r.match_count>0);
+          t.tournament_id DESC LIMIT ?`,[...p,...p,lim]);
       const years=Q('SELECT DISTINCT year FROM tournaments WHERE year IS NOT NULL ORDER BY year DESC').map(r=>r.year);
       const age_groups=Q('SELECT DISTINCT age_group FROM matches WHERE age_group IS NOT NULL ORDER BY age_group').map(r=>r.age_group);
       return {total:rows.length,years,age_groups,tournaments:rows};
