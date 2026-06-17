@@ -1090,7 +1090,7 @@ async function route(){
   const parts=path.split('/').filter(Boolean);
   try{
     if(path==='/'||path==='') return home();
-    if(parts[0]==='rankings'){const q=parseQ(query);return q.club_id?rankingsClub(q.club_id):rankings(q);}
+    if(parts[0]==='rankings'){return rankings(parseQ(query));}
     if(parts[0]==='player') return player(parts[1]);
     if(parts[0]==='h2h') return h2h(parts[1],parts[2]);
     if(parts[0]==='compare') return compare(parseQ(query));
