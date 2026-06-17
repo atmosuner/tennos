@@ -420,7 +420,7 @@ class Handler(BaseHTTPRequestHandler):
         sql = f"""
             SELECT t.tournament_id, t.name, t.city, t.start_date, t.year, t.type_text, t.surface, t.court_type,
                    c.name AS club_name,
-                   (SELECT count(*) FROM matches m WHERE m.tournament_id=t.tournament_id) AS match_count
+                   (SELECT count(*) FROM matches m WHERE m.tournament_id=t.tournament_id AND m.winner_id IS NOT NULL AND m.loser_id IS NOT NULL) AS match_count
             FROM tournaments t LEFT JOIN clubs c ON c.club_id=t.club_id
             WHERE {' AND '.join(where)}
             ORDER BY (match_count>0) DESC, t.year DESC, t.tournament_id DESC LIMIT ?

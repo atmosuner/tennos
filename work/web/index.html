@@ -417,7 +417,7 @@ syncThemeBtn();
       if(q.year){w.push('t.year=?');p.push(+q.year);}
       const lim=Math.min(+(q.limit||200),600),wc=w.join(' AND ');
       let rows=Q(`SELECT t.tournament_id,t.name,t.city,t.start_date,t.year,t.type_text,t.surface,t.court_type,c.name club_name,
-        (SELECT count(*) FROM matches m WHERE m.tournament_id=t.tournament_id) match_count
+        (SELECT count(*) FROM matches m WHERE m.tournament_id=t.tournament_id AND m.winner_id IS NOT NULL AND m.loser_id IS NOT NULL) match_count
         FROM tournaments t LEFT JOIN clubs c ON c.club_id=t.club_id WHERE ${wc}
         ORDER BY (match_count>0) DESC, t.year DESC, t.tournament_id DESC LIMIT ?`,[...p,lim]);
       if(!q.include_ongoing) rows=rows.filter(r=>r.match_count>0);
