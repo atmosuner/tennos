@@ -196,13 +196,18 @@ class Handler(BaseHTTPRequestHandler):
 
     # ---- endpoints ----
     def api_stats(self, conn):
-        g = lambda sql: conn.execute(sql).fetchone()[0]
+        from datetime import date, timedelta
+        g = lambda sql, p=(): conn.execute(sql, p).fetchone()[0]
+        cutoff = (date.today() - timedelta(days=365)).strftime("%Y%m%d")
+        af = "SUBSTR(last_match_date,7,4)||SUBSTR(last_match_date,4,2)||SUBSTR(last_match_date,1,2)>=?"
         ages = rows_to_dicts(conn.execute(
-            "SELECT age_group, count(*) n FROM player_ratings WHERE age_group IS NOT NULL GROUP BY age_group ORDER BY age_group"
+            f"SELECT age_group, count(*) n FROM player_ratings WHERE age_group IS NOT NULL AND {af} GROUP BY age_group ORDER BY age_group",
+            (cutoff,)
         ).fetchall())
         return {
             "players": g("SELECT count(*) FROM players"),
             "ratedPlayers": g("SELECT count(*) FROM player_ratings"),
+            "activeRatedPlayers": g(f"SELECT count(*) FROM player_ratings WHERE {af}", (cutoff,)),
             "clubs": g("SELECT count(*) FROM clubs"),
             "tournaments": g("SELECT count(*) FROM tournaments"),
             "matches": g("SELECT count(*) FROM matches"),
@@ -551,25 +556,42 @@ class Handler(BaseHTTPRequestHandler):
         cb = int(q.get("club_b", 0) or 0)
         lim = min(int(q.get("limit", 150) or 150), 400)
         if not ca or not cb:
-            return {"matches": [], "aWins": 0, "bWins": 0, "total": 0}
+            return {"matches": [], "aWins": 0, "bWins": 0, "total": 0, "byGender": {}}
         rows = rows_to_dicts(conn.execute(
             """SELECT m.match_id, m.match_date, m.event, m.stage, m.winner_id, m.loser_id,
                       m.p1_id, m.tournament_id, t.name AS tournament_name,
                       pw.name AS winner_name, pw.club_id AS winner_club,
-                      pl.name AS loser_name, pl.club_id AS loser_club
+                      pl.name AS loser_name, pl.club_id AS loser_club,
+                      pr.gender AS match_gender
                FROM matches m
                LEFT JOIN tournaments t ON t.tournament_id=m.tournament_id
                JOIN players pw ON pw.player_id=m.winner_id
                JOIN players pl ON pl.player_id=m.loser_id
+               LEFT JOIN player_ratings pr ON pr.player_id=m.winner_id
                WHERE m.winner_id IS NOT NULL AND m.loser_id IS NOT NULL
                  AND ((pw.club_id=? AND pl.club_id=?) OR (pw.club_id=? AND pl.club_id=?))
                ORDER BY SUBSTR(REPLACE(m.match_date,' ',''),7,4)||SUBSTR(REPLACE(m.match_date,' ',''),4,2)||SUBSTR(REPLACE(m.match_date,' ',''),1,2) DESC
                LIMIT ?""",
             (ca, cb, cb, ca, lim),
         ).fetchall())
-        a_wins = sum(1 for r in rows if r["winner_club"] == ca)
-        b_wins = len(rows) - a_wins
-        return {"matches": rows, "aWins": a_wins, "bWins": b_wins, "total": len(rows)}
+        a_wins = 0
+        b_wins = 0
+        by_gender: dict = {}
+        for r in rows:
+            aw = r["winner_club"] == ca
+            if aw:
+                a_wins += 1
+            else:
+                b_wins += 1
+            g = r.get("match_gender") or "Diğer"
+            if g not in by_gender:
+                by_gender[g] = {"aWins": 0, "bWins": 0, "total": 0}
+            by_gender[g]["total"] += 1
+            if aw:
+                by_gender[g]["aWins"] += 1
+            else:
+                by_gender[g]["bWins"] += 1
+        return {"matches": rows, "aWins": a_wins, "bWins": b_wins, "total": len(rows), "byGender": by_gender}
 
     def api_search(self, conn, q):
         term = q.get("q", "").strip()
