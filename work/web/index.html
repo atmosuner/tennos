@@ -720,7 +720,7 @@ async function h2h(a,b){
 
 // ---------- Clubs ----------
 async function clubs(){
-  app().innerHTML=`<h1>Kulüpler</h1><div class="filters"><input id="cq" class="" placeholder="kulüp ara…" style="background:var(--panel2);border:1px solid var(--line);color:var(--txt);padding:8px 12px;border-radius:8px;outline:none"></div><div id="cl" class="loading">…</div>`;
+  app().innerHTML=`<h1>Kulüpler</h1><div class="filters"><input id="cq" class="" placeholder="kulüp ara…" style="background:var(--panel2);border:1px solid var(--line);color:var(--txt);padding:8px 12px;border-radius:8px;outline:none;font-size:16px"></div><div id="cl" class="loading">…</div>`;
   const load=async term=>{const d=await api('/clubs'+qs({q:term||'',limit:200}));
     $('#cl').outerHTML=`<div id="cl"><table><thead><tr><th>Kulüp</th><th>Şehir</th><th>Oyuncu</th><th>Reytingli</th></tr></thead><tbody>
       ${d.clubs.map(c=>`<tr><td><a href="#/rankings?club_id=${c.club_id}">${esc(c.name)}</a></td><td class="muted">${esc(c.city||'')}</td><td>${c.player_count}</td><td>${c.rated_count}</td></tr>`).join('')}
@@ -742,7 +742,7 @@ async function players_dir(params){
   const page=Math.max(1,parseInt(params.page||'1')), limit=50, offset=(page-1)*limit;
   app().innerHTML=`<h1>Oyuncular</h1>
     <div class="filters">
-      <input id="pQ" value="${esc(term)}" placeholder="isim ara…" style="background:var(--panel2);border:1px solid var(--line);color:var(--txt);padding:8px 12px;border-radius:8px;outline:none">
+      <input id="pQ" value="${esc(term)}" placeholder="isim ara…" style="background:var(--panel2);border:1px solid var(--line);color:var(--txt);padding:8px 12px;border-radius:8px;outline:none;font-size:16px">
       <select id="pGen"><option value="">Tüm Cinsiyet</option><option value="Erkek" ${gn=='Erkek'?'selected':''}>Erkek</option><option value="Kadın" ${gn=='Kadın'?'selected':''}>Kadın</option></select>
       <select id="pYear"><option value="">Tüm Doğum Yılı</option></select>
       <select id="pRated"><option value="">Tümü</option><option value="1" ${rated=='1'?'selected':''}>Sadece reytingli</option></select>
@@ -776,7 +776,7 @@ async function tournaments(params){
   app().innerHTML=`<h1>Turnuvalar</h1>
     <div class="filters">
       <select id="tYear"><option value="">Tüm Yıllar</option></select>
-      <input id="tQ" value="${esc(term)}" placeholder="turnuva / şehir ara…" style="background:var(--panel2);border:1px solid var(--line);color:var(--txt);padding:8px 12px;border-radius:8px;outline:none">
+      <input id="tQ" value="${esc(term)}" placeholder="turnuva / şehir ara…" style="background:var(--panel2);border:1px solid var(--line);color:var(--txt);padding:8px 12px;border-radius:8px;outline:none;font-size:16px">
     </div>
     <div id="tl" class="loading">…</div>`;
   const d=await api('/tournaments'+qs({year:yr,q:term,limit:400}));
