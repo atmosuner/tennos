@@ -1093,8 +1093,7 @@ function commonSection(cm,a,b){
 
 function clubOpponentsSection(co,bName,clubName,aId,clubOwnerName){
   const bn=esc(bName.split(' ')[0]);
-  const ownerTag=clubOwnerName?` <span class="tag">${esc(clubOwnerName.split(' ')[0])}'nın kulübü</span>`:'';
-  const title=`${esc(clubName)}${ownerTag}`;
+  const title=`${bn} vs. ${esc(clubName)} maçları`;
   if(!co.opponents||!co.opponents.length) return `<h2 style="text-align:center">${title}</h2><p class="muted" style="text-align:center">${bn}'un ${esc(clubName)} kulübü oyuncularına karşı maçı yok.</p>`;
   const mlines=ms=>ms.map(m=>`<div style="padding:6px 0;border-bottom:1px solid var(--line)">
     <div class="flex"><span class="badge ${m.won?'W':'L'}">${m.won?'G':'M'}</span><span class="score">${esc(m.score)||'<span class=muted>—</span>'}</span></div>
