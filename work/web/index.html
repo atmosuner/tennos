@@ -541,7 +541,7 @@ syncThemeBtn();
         byGender[g].total++;
         if(aw)byGender[g].aWins++;else byGender[g].bWins++;
       }
-      const matches=rows.map(r=>({...r,score:buildSetScore(r.match_id,r.winner_id===r.p1_id)}));
+      const matches=rows.map(r=>({...r,score:buildSetScore(r.match_id,r.winner_id===r.p1_id),fullScore:buildScore(r.match_id,r.winner_id===r.p1_id)}));
       return {matches,aWins,bWins,total:matches.length,byGender};
     }
   };
@@ -1083,7 +1083,8 @@ async function renderClubCompare(a,b,an,bn){
   };;
   const mkLine=(m)=>{
     const aWon=m.winner_club===+a;
-    const sc=m.score?`<span class="sc-ic" title="${esc(m.score)}">${esc(m.score.split(' ')[0])}</span>`:'';
+    const scTxt=m.score||'W.O.';const scTip=m.fullScore||'Walkover';
+    const sc=`<span class="sc-ic" title="${esc(scTip)}">${esc(scTxt)}</span>`;
     const info=[m.tournament_name,m.event,m.stage,m.match_date].filter(Boolean).join(' · ');
     const ti=info?(m.tournament_id?`<a href="#/tournament/${m.tournament_id}" class="sc-ic" title="${esc(info)}" style="font-style:italic">i</a>`:`<span class="sc-ic" title="${esc(info)}" style="font-style:italic;cursor:help">i</span>`):'';
     return `<div class="matchline">
