@@ -187,6 +187,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(self.api_search(conn, q))
             elif path == "/api/club_opponents":
                 self.send_json(self.api_club_opponents(conn, q))
+            elif path == "/api/club_vs_club":
+                self.send_json(self.api_club_vs_club(conn, q))
             else:
                 self.send_json({"error": "not found"}, status=404)
         finally:
@@ -543,6 +545,31 @@ class Handler(BaseHTTPRequestHandler):
             })
         opponents = sorted(by_opp.values(), key=lambda x: x["w"] + x["l"], reverse=True)
         return {"opponents": opponents}
+
+    def api_club_vs_club(self, conn, q):
+        ca = int(q.get("club_a", 0) or 0)
+        cb = int(q.get("club_b", 0) or 0)
+        lim = min(int(q.get("limit", 150) or 150), 400)
+        if not ca or not cb:
+            return {"matches": [], "aWins": 0, "bWins": 0, "total": 0}
+        rows = rows_to_dicts(conn.execute(
+            """SELECT m.match_id, m.match_date, m.event, m.stage, m.winner_id, m.loser_id,
+                      m.p1_id, m.tournament_id, t.name AS tournament_name,
+                      pw.name AS winner_name, pw.club_id AS winner_club,
+                      pl.name AS loser_name, pl.club_id AS loser_club
+               FROM matches m
+               LEFT JOIN tournaments t ON t.tournament_id=m.tournament_id
+               JOIN players pw ON pw.player_id=m.winner_id
+               JOIN players pl ON pl.player_id=m.loser_id
+               WHERE m.winner_id IS NOT NULL AND m.loser_id IS NOT NULL
+                 AND ((pw.club_id=? AND pl.club_id=?) OR (pw.club_id=? AND pl.club_id=?))
+               ORDER BY SUBSTR(REPLACE(m.match_date,' ',''),7,4)||SUBSTR(REPLACE(m.match_date,' ',''),4,2)||SUBSTR(REPLACE(m.match_date,' ',''),1,2) DESC
+               LIMIT ?""",
+            (ca, cb, cb, ca, lim),
+        ).fetchall())
+        a_wins = sum(1 for r in rows if r["winner_club"] == ca)
+        b_wins = len(rows) - a_wins
+        return {"matches": rows, "aWins": a_wins, "bWins": b_wins, "total": len(rows)}
 
     def api_search(self, conn, q):
         term = q.get("q", "").strip()
