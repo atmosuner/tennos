@@ -364,11 +364,13 @@ syncThemeBtn();
       const c=new Date();c.setFullYear(c.getFullYear()-1);
       const cs=c.getFullYear()+String(c.getMonth()+1).padStart(2,'0')+String(c.getDate()).padStart(2,'0');
       const af=`SUBSTR(last_match_date,7,4)||SUBSTR(last_match_date,4,2)||SUBSTR(last_match_date,1,2)>='${cs}'`;
+      const byAgeGender=Q(`SELECT age_group,gender,count(*) n FROM player_ratings WHERE age_group IS NOT NULL AND gender IS NOT NULL AND ${af} GROUP BY age_group,gender ORDER BY age_group,gender`)
+        .map(c=>({...c,top3:Q(`SELECT player_id,name,rating,club_name FROM player_ratings WHERE age_group=? AND gender=? AND ${af} ORDER BY rating DESC LIMIT 3`,[c.age_group,c.gender])}));
       return {players:scalar('SELECT count(*) FROM players'),ratedPlayers:scalar('SELECT count(*) FROM player_ratings'),
         activeRatedPlayers:scalar(`SELECT count(*) FROM player_ratings WHERE ${af}`),
         clubs:scalar('SELECT count(*) FROM clubs'),tournaments:scalar('SELECT count(*) FROM tournaments'),
         matches:scalar('SELECT count(*) FROM matches'),completed:scalar("SELECT count(*) FROM matches WHERE result_type='completed'"),
-        byAgeGroup:Q(`SELECT age_group,count(*) n FROM player_ratings WHERE age_group IS NOT NULL AND ${af} GROUP BY age_group ORDER BY age_group`)};
+        byAgeGender};
     },
     rankings(q){
       const w=['1=1'],p=[];
@@ -637,7 +639,20 @@ function setNav(){document.querySelectorAll('#nav a').forEach(a=>{
 // ---------- Home ----------
 async function home(){
   const s=await api('/stats');
-  const ages=s.byAgeGroup.map(a=>`<a href="#/rankings?age_group=${a.age_group}" class="pill age" style="margin:2px">${a.age_group} Yaş · ${a.n}</a>`).join(' ');
+  const grid=(s.byAgeGender||[]).map(c=>{
+    const col=c.gender==='Erkek'?'#4ab0ff':'#ff7ab0';
+    const rows=c.top3.map((p,i)=>`<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-top:1px solid var(--line)">
+      <span style="color:var(--dim);font-size:11px;min-width:12px;text-align:right">${i+1}</span>
+      <a href="#/player/${p.player_id}" style="flex:1;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.name)}</a>
+      <span class="rating" style="font-size:12px;flex-shrink:0">${Math.round(p.rating)}</span>
+    </div>`).join('');
+    return `<div class="card" style="padding:12px">
+      <a href="#/rankings${qs({age_group:c.age_group,gender:c.gender})}" style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;text-decoration:none;gap:6px">
+        <span style="font-weight:700;font-size:14px;color:var(--txt);white-space:nowrap">${c.age_group} Yaş</span>
+        <span style="font-weight:600;font-size:12px;color:${col}">${c.gender}</span>
+        <span class="tag" style="margin-left:auto;white-space:nowrap">${c.n} aktif</span>
+      </a>${rows}</div>`;
+  }).join('');
   app().innerHTML=`
     <h1>Junior Tenis Analitik</h1>
     <p class="sub">İ-KORT 8–14 yaş turnuva verisi · Elo reyting · head-to-head</p>
@@ -647,7 +662,7 @@ async function home(){
       <div class="card"><div class="v">${s.tournaments.toLocaleString('tr')}</div><div class="l">Turnuva</div></div>
       <div class="card"><div class="v">${s.clubs.toLocaleString('tr')}</div><div class="l">Kulüp</div></div>
     </div>
-    <div style="margin:10px 0 24px">${ages}</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:12px;max-width:1000px;margin:20px auto 32px">${grid}</div>
     <details style="margin:0 0 28px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 18px">
       <summary style="cursor:pointer;font-weight:700;color:var(--txt2);font-size:13.5px;letter-spacing:.01em;list-style:none;display:flex;align-items:center;gap:8px">
         <span style="color:var(--accent-ink)">▸</span> Elo reyting nasıl hesaplanır?
@@ -658,11 +673,7 @@ async function home(){
         <p style="margin:0">İlk 30 maçta puan iki kat hızlı değişir (yeni oyuncuların yeri daha çabuk belirlenir), sonra yavaşlar.</p>
         <p style="margin:0">Sadece biten maçlar sayılır — skor girilmemişse, walkover veya emeklilik varsa sayılmaz. Sıralamaya girmek için en az 5 maç gerekir.</p>
       </div>
-    </details>
-    <h2>Genel Top 15</h2>
-    <div id="top" class="loading">…</div>`;
-  const r=await api('/rankings?limit=15');
-  $('#top').outerHTML=`<div id="top">${rankTable(r.rankings,'overall_rank')}</div>`;
+    </details>`;
 }
 
 function genderP(g){ if(!g) return ''; const c=g==='Erkek'?'#4ab0ff':'#ff7ab0';
@@ -1361,14 +1372,14 @@ function clubOpponentsSection(co,bName,clubName,aId,clubOwnerName){
     <div class="tag" style="margin-top:3px">${esc(m.event||'')}${m.stage?' · '+esc(m.stage):''}<br>${m.tournamentId?`<a href="#/tournament/${m.tournamentId}">${esc(m.tournamentName||'turnuva')}</a> · `:''}${esc(m.date||'')}</div>
   </div>`).join('');
   const rows=co.opponents.map((o,i)=>{
-    const rate=o.w+o.l?o.w/(o.w+o.l):0;
+    const uid=`co_${aId}_${i}`;
     const rowBg=o.w>o.l?'var(--win-soft)':o.l>o.w?'var(--loss-soft)':'rgba(176,125,18,.12)';
     const scoreCol=o.w>o.l?'var(--win)':o.l>o.w?'var(--loss)':'var(--gold)';
-    const main=`<tr style="cursor:pointer;background:${rowBg}" onclick="(function(){var d=document.getElementById('co${i}');d.style.display=d.style.display==='none'?'table-row':'none';})()">
+    const main=`<tr style="cursor:pointer;background:${rowBg}" onclick="(function(){var d=document.getElementById('${uid}');d.style.display=d.style.display==='none'?'table-row':'none';})()">
       <td><span class="tag">▸</span> <a href="#/player/${o.oppId}" onclick="event.stopPropagation()">${esc(o.oppName)}</a></td>
       <td style="text-align:center;font-weight:700;color:${scoreCol}">${o.w}-${o.l}</td>
       <td style="text-align:center">${o.w+o.l} maç</td></tr>`;
-    const detail=`<tr id="co${i}" style="display:none"><td colspan="3" style="background:var(--panel2)">
+    const detail=`<tr id="${uid}" style="display:none"><td colspan="3" style="background:var(--panel2)">
       <div style="padding:8px 4px">${mlines(o.matches)}</div></td></tr>`;
     return main+detail;}).join('');
   const total=co.opponents.reduce((s,o)=>s+o.w+o.l,0);
