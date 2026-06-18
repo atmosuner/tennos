@@ -9,7 +9,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <script>(function(){try{var t=localStorage.getItem('tennos-theme')||'light';document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','light');}try{var p=localStorage.getItem('tennos-palette')||'clay';document.documentElement.setAttribute('data-palette',p);}catch(e){document.documentElement.setAttribute('data-palette','clay');}})();</script>
-<script src="config.js"></script>
 <style>
   :root{
     --font-disp:"Archivo","Hanken Grotesk",system-ui,sans-serif;
@@ -1137,23 +1136,19 @@ async function player(id){
   app().insertBefore(aiCard, rowEl);
 }
 
+const AI_PROXY_URL='https://kortex-groq.bahadiruner82.workers.dev';
 async function analyzeWithGemini(){
-  const key=typeof GROQ_API_KEY!=='undefined'?GROQ_API_KEY:'';
-  if(!key||key==='YOUR_GROQ_API_KEY_HERE'){
-    document.getElementById('ai-result').innerHTML='<p class="muted" style="color:var(--loss)">API key eksik. <code>work/web/config.js</code> dosyasına Groq key gir.</p>';
-    return;
-  }
   const btn=document.getElementById('ai-analyze-btn');
   const res=document.getElementById('ai-result');
   btn.disabled=true; btn.textContent='Değerlendiriliyor…';
   res.innerHTML='<p class="muted">Groq yanıt veriyor…</p>';
   try{
-    const resp=await fetch('https://api.groq.com/openai/v1/chat/completions',{
+    const resp=await fetch(AI_PROXY_URL,{
       method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
-      body:JSON.stringify({model:'llama-3.3-70b-versatile',messages:[{role:'user',content:window._currentAiPrompt}],temperature:0.7,max_tokens:2048})
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({prompt:window._currentAiPrompt})
     });
-    if(!resp.ok){const err=await resp.json();throw new Error(err.error?.message||resp.statusText);}
+    if(!resp.ok){const err=await resp.json().catch(()=>({}));throw new Error(err.error?.message||resp.statusText);}
     const data=await resp.json();
     const text=data.choices?.[0]?.message?.content||'Yanıt alınamadı.';
     try{ localStorage.setItem('ai_analysis_'+window._currentPlayerId, JSON.stringify({ts:Date.now(),response:text})); }catch(e){}
