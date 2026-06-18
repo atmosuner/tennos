@@ -25,6 +25,25 @@ python3 work/serve.py                        # web app at http://localhost:8001
 After the scraper adds new tournaments, re-run `resolve_clubs.py` (incremental — only
 fetches newly-unresolved players), then `build_db.py` + `build_ratings.py` to refresh.
 
+### Incremental refresh (ongoing tournaments)
+
+```bash
+python3 work/refresh_current.py --no-ssl-verify
+```
+
+Fetches ikort.com.tr/turnuvalar, re-scrapes active yaş turnuvaları, rebuilds DB + web DB
+in one shot. Run manually when tournament results need updating.
+
+**Source union:** scrapes two sets merged:
+1. ikort "güncel" tab right now (new + ongoing)
+2. `tennos.db` tournaments with `source_tab='guncel'` (previously current, may have moved
+   to geçmiş on ikort before we ran the script)
+
+**Filters:** 8–14 yaş only (checks `turnuvaAdi`); drops doubles/takım, drops 15+ yaş.
+
+**Flags:** `--dry-run` (print plan, no writes), `--no-rebuild` (scrape only), `--no-gzip`,
+`--no-ssl-verify` (required on corporate proxy networks with SSL inspection).
+
 ## Key concepts
 
 **Club resolution is the hard part.** Player names in match data carry a free-text club
