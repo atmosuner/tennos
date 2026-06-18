@@ -15,6 +15,7 @@ import gzip
 import json
 import re
 import shutil
+import sqlite3
 import ssl
 import subprocess
 import sys
@@ -30,6 +31,7 @@ OUTPUTS = PROJECT_ROOT / "outputs"
 WORK = PROJECT_ROOT / "work"
 TOURNAMENTS_JSON = OUTPUTS / "tournaments.json"
 FILTERED_JSON = OUTPUTS / "filtered_yas_tournaments.json"
+DB_PATH = OUTPUTS / "tennos.db"
 WEB_DB = WORK / "web" / "tennos-web.db"
 WEB_DB_GZ = WORK / "web" / "tennos-web.db.gz"
 
@@ -188,6 +190,21 @@ def is_yas_tournament(t: dict[str, Any]) -> bool:
     return 8 <= int(m.group(1)) <= 14
 
 
+def get_db_guncel_ids() -> set[str]:
+    """Return tournament IDs from DB that were previously seen as 'guncel' and pass yaş filter."""
+    if not DB_PATH.exists():
+        return set()
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        rows = conn.execute(
+            "SELECT tournament_id, name FROM tournaments WHERE source_tab='guncel'"
+        ).fetchall()
+        conn.close()
+        return {str(tid) for tid, name in rows if is_yas_tournament({"turnuvaAdi": name})}
+    except Exception:
+        return set()
+
+
 def load_existing(path: Path) -> dict[str, dict[str, Any]]:
     if not path.exists():
         return {}
@@ -273,15 +290,22 @@ def main() -> int:
     if not args.dry_run:
         atomic_write_json(FILTERED_JSON, {"tournaments": list(yas_merged.values())})
     guncel_yas = [t for t in guncel if is_yas_tournament(t)]
-    print(f"filtered_yas: güncel yaş turnuvası = {len(guncel_yas)}")
+    ikort_ids = {str(t["turnuvaId"]) for t in guncel_yas}
+    db_ids = get_db_guncel_ids()
+    only_in_db = db_ids - ikort_ids
+    all_ids = ikort_ids | db_ids
+    print(f"filtered_yas: ikort güncel={len(ikort_ids)}, db güncel={len(db_ids)}, sadece db'de={len(only_in_db)}, toplam={len(all_ids)}")
 
-    if not guncel_yas:
+    if not all_ids:
         print("yaş kategorisinde güncel turnuva yok — çıkılıyor")
         return 0
 
-    ids = ",".join(str(t["turnuvaId"]) for t in guncel_yas)
     for t in guncel_yas:
         print(f"  {t['turnuvaId']}  {t['turnuvaAdi']}  [{t['kategori']}]  {t['tarih']}")
+    if only_in_db:
+        print(f"  + DB'den eklenen: {sorted(only_in_db)}")
+
+    ids = ",".join(sorted(all_ids))
 
     if args.no_rebuild:
         print("\n--no-rebuild: scrape de atlandı (sadece liste güncellendi)")
