@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script>(function(){try{var t=localStorage.getItem('tennos-theme')||'light';document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','light');}})();</script>
+<script src="config.js"></script>
 <style>
   :root{
     --font-disp:"Archivo","Hanken Grotesk",system-ui,sans-serif;
@@ -190,6 +191,9 @@
   .cmp .bar i{display:block;height:100%} .bar .ia{background:var(--accent)} .bar .ib{background:var(--accent2)}
   .win-hi{color:var(--accent-ink)} .win-lo{color:var(--dim)}
   .loading{color:var(--dim);padding:56px;text-align:center;font-size:15px}
+  details>summary{list-style:none}details>summary::-webkit-details-marker{display:none}
+  details[open]>summary .toggle-arrow{transform:rotate(180deg)}
+  .toggle-arrow{display:inline-block;transition:transform .2s;color:var(--dim);font-size:13px}
   #cmpBar{position:sticky;top:57px;z-index:29;background:var(--panel);border-bottom:1px solid var(--line);padding:7px 24px;display:none}
   @media(max-width:700px){#cmpBar{top:50px;padding:6px 12px}}
   .cmp-bar-inner{display:flex;align-items:center;gap:10px;font-size:13px;flex-wrap:wrap}
@@ -343,8 +347,10 @@ syncThemeBtn();
       WHERE (m.winner_id=? OR m.loser_id=?) AND m.winner_id IS NOT NULL AND m.loser_id IS NOT NULL`,[pid,pid]);
     rows.sort((x,y)=>dkey(y.match_date)-dkey(x.match_date));
     return rows.map(r=>{const won=r.winner_id===pid, opp=won?r.loser_id:r.winner_id;
+      const dk=r.match_date?r.match_date.slice(6,10)+r.match_date.slice(3,5)+r.match_date.slice(0,2):'';
+      const oppRatingRow=dk?one(`SELECT rating_after FROM player_rating_history WHERE player_id=? AND SUBSTR(match_date,7,4)||SUBSTR(match_date,4,2)||SUBSTR(match_date,1,2)<?  ORDER BY SUBSTR(match_date,7,4)||SUBSTR(match_date,4,2)||SUBSTR(match_date,1,2) DESC, rowid DESC LIMIT 1`,[opp,dk]):null;
       return {matchId:r.match_id,date:r.match_date,event:r.event,ageGroup:r.age_group,stage:r.stage,won,
-        resultType:r.result_type,opponentId:opp,opponentName:nameOf(opp),
+        resultType:r.result_type,opponentId:opp,opponentName:nameOf(opp),opponentRating:oppRatingRow?Math.round(oppRatingRow.rating_after):null,
         score:buildScore(r.match_id,r.p1_id===pid),tournamentId:r.tournament_id,tournamentName:r.tname,city:r.city};});
   }
   function matchesBetween(p,opp){
@@ -808,7 +814,7 @@ async function player(id){
                   `<span class="badge ${m.won?'W':'L'}">${m.won?'G':'M'}</span>`;
       return `<div class="matchline">
         ${badge}
-        <a href="#/player/${m.opponentId}">${esc(m.opponentName)}</a>
+        <a href="#/player/${m.opponentId}">${esc(m.opponentName)}</a>${m.opponentRating?` <span class="tag" title="Maç tarihindeki rakip reytingi">${m.opponentRating}</span>`:''}
         <span class="score muted">${esc(m.score)}</span>
         <span style="margin-left:auto;text-align:right">
           <span class="tag">${esc(m.event||'')} ${m.stage?'· '+esc(m.stage):''}</span><br>
@@ -827,6 +833,8 @@ async function player(id){
     }
     const hist=d.ratingHistory;
     if(!hist||!hist.length){$('#ratingChartWrap').innerHTML='<p class="muted">veri yok</p>';return;}
+    const existingChart=window.Chart.getChart('ratingChart');
+    if(existingChart) existingChart.destroy();
     const labels=hist.map((_,i)=>i+1);
     const data=hist.map(h=>h.rating_after);
     const isDark=document.documentElement.getAttribute('data-theme')==='dark';
@@ -870,25 +878,461 @@ async function player(id){
         <div id="ratingChartWrap" style="position:relative;width:100%;flex:1;min-height:140px"><canvas id="ratingChart"></canvas></div>
       </div>
     </div>
-    <div class="row">
-      <div class="col">
-        <h2>Maçlar</h2>
-        <div class="filters" style="margin-bottom:12px">
-          <select id="mYear"><option value="">Tüm Yıllar</option>${years.map(y=>`<option value="${y}">${y}</option>`).join('')}</select>
-          <select id="mRes"><option value="">Tümü</option><option value="W">Galibiyet</option><option value="L">Mağlubiyet</option></select>
-          ${ageGroups.length>1?`<select id="mAg"><option value="">Tüm Kategoriler</option>${ageGroups.map(a=>`<option value="${a}">${a} Yaş</option>`).join('')}</select>`:''}
+    <div id="matches-card" class="card" style="padding:0;margin-top:0">
+      <details>
+        <summary style="list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;user-select:none;padding:16px 22px">
+          <h2 style="margin:0">Maçlar & Rakipler</h2>
+          <span class="toggle-arrow">▾</span>
+        </summary>
+        <div style="padding:0 22px 20px">
+          <div class="row" style="margin-top:0">
+            <div class="col">
+              <div class="filters" style="margin-bottom:12px">
+                <select id="mYear"><option value="">Tüm Yıllar</option>${years.map(y=>`<option value="${y}">${y}</option>`).join('')}</select>
+                <select id="mRes"><option value="">Tümü</option><option value="W">Galibiyet</option><option value="L">Mağlubiyet</option></select>
+                ${ageGroups.length>1?`<select id="mAg"><option value="">Tüm Kategoriler</option>${ageGroups.map(a=>`<option value="${a}">${a} Yaş</option>`).join('')}</select>`:''}
+              </div>
+              <div id="mlist"></div>
+            </div>
+            <div class="col" style="max-width:340px">
+              <h2>En Çok Karşılaşılan</h2>${opps}
+            </div>
+          </div>
         </div>
-        <div id="mlist"></div>
-      </div>
-      <div class="col" style="max-width:340px">
-        <h2>En Çok Karşılaşılan</h2>${opps}
-      </div>
+      </details>
     </div>`;
   const upd=()=>window._renderMatches($('#mRes').value,$('#mYear').value,$('#mAg')?$('#mAg').value:'');
   $('#mYear').onchange=upd; $('#mRes').onchange=upd;
   if($('#mAg')) $('#mAg').onchange=upd;
   renderMatches('','','');
   drawRatingChart();
+
+  // --- AI section (inserted before matches row) ---
+  const aiPrompt=buildAiPrompt(id,d,byYear,recentForForm);
+  window._currentAiPrompt=aiPrompt;
+  window._currentPlayerId=id;
+
+  const cached=(() => { try{ const s=localStorage.getItem('ai_analysis_'+id); return s?JSON.parse(s):null; } catch(e){ return null; } })();
+  const cachedHtml=cached?renderAiResponse(cached.response):'';
+  const cachedMeta=cached?`<span class="tag" style="margin-left:8px">${new Date(cached.ts).toLocaleDateString('tr-TR',{day:'numeric',month:'short',year:'numeric'})}</span>`:'';
+
+  const aiCard=document.createElement('div');
+  aiCard.className='card';
+  aiCard.style.cssText='padding:0;margin-bottom:14px;overflow:hidden';
+  aiCard.innerHTML=`
+    <details style="padding:0">
+      <summary style="list-style:none;padding:16px 22px;cursor:pointer;display:flex;align-items:center;gap:10px;user-select:none">
+        <span style="font-size:17px;font-weight:700;font-family:var(--font-disp)">AI Değerlendirmesi</span>
+        <span class="pill" style="font-size:11px;font-weight:500;background:var(--accent-soft);color:var(--accent-ink)">Groq · Llama 3.3</span>
+        ${cachedMeta}
+        <span class="toggle-arrow" style="margin-left:auto">▾</span>
+      </summary>
+      <div style="padding:0 22px 20px">
+        <details style="margin-bottom:14px">
+          <summary style="cursor:pointer;color:var(--dim);font-size:13px;user-select:none">Hazırlanan prompt göster</summary>
+          <pre id="ai-prompt-txt" style="margin-top:10px;white-space:pre-wrap;font-size:12px;line-height:1.5;color:var(--txt2);background:var(--panel2);padding:14px;border-radius:10px;border:1px solid var(--line);overflow:auto;max-height:300px">${esc(aiPrompt)}</pre>
+          <div style="display:flex;justify-content:flex-end;margin-top:6px"><button onclick="(b=>{ const t=window._currentAiPrompt||''; if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(()=>{b.textContent='Kopyalandı ✓';setTimeout(()=>b.textContent='Promptu Kopyala',2000);}).catch(()=>fallbackCopy(t,b));}else fallbackCopy(t,b);})(this)" style="background:var(--panel2);border:1px solid var(--line);padding:5px 12px;border-radius:8px;font-size:12px;cursor:pointer;color:var(--dim)">Promptu Kopyala</button></div>
+        </details>
+        <button id="ai-analyze-btn" onclick="analyzeWithGemini()" style="background:var(--accent);color:#fff;border:none;padding:10px 20px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">${cached?'Yenile':'Değerlendir'}</button>
+        <div id="ai-result" style="margin-top:16px">${cachedHtml}</div>
+      </div>
+    </details>`;
+  const rowEl=$('#matches-card');
+  app().insertBefore(aiCard, rowEl);
+}
+
+async function analyzeWithGemini(){
+  const key=typeof GROQ_API_KEY!=='undefined'?GROQ_API_KEY:'';
+  if(!key||key==='YOUR_GROQ_API_KEY_HERE'){
+    document.getElementById('ai-result').innerHTML='<p class="muted" style="color:var(--loss)">API key eksik. <code>work/web/config.js</code> dosyasına Groq key gir.</p>';
+    return;
+  }
+  const btn=document.getElementById('ai-analyze-btn');
+  const res=document.getElementById('ai-result');
+  btn.disabled=true; btn.textContent='Değerlendiriliyor…';
+  res.innerHTML='<p class="muted">Groq yanıt veriyor…</p>';
+  try{
+    const resp=await fetch('https://api.groq.com/openai/v1/chat/completions',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
+      body:JSON.stringify({model:'llama-3.3-70b-versatile',messages:[{role:'user',content:window._currentAiPrompt}],temperature:0.7,max_tokens:2048})
+    });
+    if(!resp.ok){const err=await resp.json();throw new Error(err.error?.message||resp.statusText);}
+    const data=await resp.json();
+    const text=data.choices?.[0]?.message?.content||'Yanıt alınamadı.';
+    try{ localStorage.setItem('ai_analysis_'+window._currentPlayerId, JSON.stringify({ts:Date.now(),response:text})); }catch(e){}
+    window._lastAiResponse=text;
+    res.innerHTML=renderAiResponse(text);
+    // update header date
+    const meta=document.querySelector('#ai-analyze-btn')?.closest('.card')?.querySelector('h2 .tag');
+    if(meta) meta.textContent=new Date().toLocaleDateString('tr-TR',{day:'numeric',month:'short',year:'numeric'});
+    else{ const h2=document.querySelector('#ai-analyze-btn')?.closest('.card')?.querySelector('h2'); if(h2){ const sp=document.createElement('span'); sp.className='tag'; sp.style.marginLeft='8px'; sp.textContent=new Date().toLocaleDateString('tr-TR',{day:'numeric',month:'short',year:'numeric'}); h2.appendChild(sp); } }
+  }catch(e){
+    res.innerHTML=`<p class="muted" style="color:var(--loss)">Hata: ${esc(e.message)}</p>`;
+  }finally{
+    btn.disabled=false; btn.textContent='Yenile';
+  }
+}
+
+function renderAiResponse(text){
+  window._lastAiResponse=text;
+  const html=text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/^### (.+)$/gm,'<h4 style="margin:12px 0 4px;color:var(--accent-ink)">$1</h4>')
+    .replace(/^## (.+)$/gm,'<h3 style="margin:14px 0 6px;color:var(--txt)">$1</h3>')
+    .replace(/^# (.+)$/gm,'<h2 style="margin:16px 0 8px">$1</h2>')
+    .replace(/^- (.+)$/gm,'<li style="margin:2px 0">$1</li>')
+    .replace(/\n/g,'<br>');
+  return `<div style="display:flex;justify-content:flex-end;margin-bottom:6px"><button id="ai-copy-btn" onclick="copyAiResponse(this)" style="background:var(--panel2);border:1px solid var(--line);padding:5px 12px;border-radius:8px;font-size:12px;cursor:pointer;color:var(--dim)">Kopyala</button></div><div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:16px;font-size:14px;line-height:1.75;color:var(--txt)">${html}</div>`;
+}
+
+function copyAiResponse(btn){
+  const txt=window._lastAiResponse||'';
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(()=>{btn.textContent='Kopyalandı ✓';setTimeout(()=>btn.textContent='Kopyala',2000);}).catch(()=>fallbackCopy(txt,btn));
+  } else { fallbackCopy(txt,btn); }
+}
+function fallbackCopy(txt,btn){
+  const ta=document.createElement('textarea');
+  ta.value=txt; ta.style.cssText='position:fixed;opacity:0';
+  document.body.appendChild(ta); ta.select();
+  try{document.execCommand('copy');btn.textContent='Kopyalandı ✓';setTimeout(()=>btn.textContent='Kopyala',2000);}
+  catch(e){btn.textContent='Hata';}
+  document.body.removeChild(ta);
+}
+
+function buildAiPrompt(id,d,byYear,recentForForm){
+  const r=d.rating, b=d.player;
+  const name=(r&&r.name)||(b&&b.name)||('#'+id);
+  const birthYear=b&&b.birth_year?b.birth_year:null;
+  const currentYear=new Date().getFullYear();
+  const age=birthYear?`${currentYear-birthYear} yaşında (${birthYear} doğumlu)`:'';
+  const gender=b&&b.gender?b.gender:'';
+  const club=r&&r.club_name?r.club_name:(b&&b.club_name)||'';
+  const city=b&&b.city?b.city:'';
+  const elo=r?Math.round(r.rating):null;
+  const peak=r?Math.round(r.peak_rating):null;
+  const firstRating=d.ratingHistory&&d.ratingHistory.length?Math.round(d.ratingHistory[0].rating_after):null;
+  const wins=r?r.wins:0, losses=r?r.losses:0;
+  const total=wins+losses;
+  const pct=total?Math.round(wins/total*100):0;
+  const ageGroup=r&&r.age_group?r.age_group:'';
+  const overallRank=r?r.overall_rank:null;
+  const genderRank=r&&r.gender_rank?r.gender_rank:null;
+  const agRank=r&&r.age_group_rank?r.age_group_rank:null;
+
+  // rating trend
+  const ratingTrend=elo&&firstRating?(elo>firstRating?`+${elo-firstRating} artış`:`${elo-firstRating} düşüş`):'';
+  const peakDiff=elo&&peak&&peak>elo?`(zirveden ${peak-elo} puan düşük)`:'';
+  const hist=d.ratingHistory||[];
+  const last10hist=hist.slice(-10).map(h=>Math.round(h.rating_after));
+  const last5hist=hist.slice(-5).map(h=>Math.round(h.rating_after));
+  const recentDelta5=last5hist.length>=2?last5hist[last5hist.length-1]-last5hist[0]:null;
+  const recentDelta10=last10hist.length>=2?last10hist[last10hist.length-1]-last10hist[0]:null;
+  const ratingSnapshots=hist.length>=4?[
+    {label:'İlk maç',v:Math.round(hist[0].rating_after)},
+    {label:'%25',v:Math.round(hist[Math.floor(hist.length*0.25)].rating_after)},
+    {label:'%50',v:Math.round(hist[Math.floor(hist.length*0.50)].rating_after)},
+    {label:'%75',v:Math.round(hist[Math.floor(hist.length*0.75)].rating_after)},
+    {label:'Son maç',v:elo},
+  ]:[];
+  const ratingProgressLine=ratingSnapshots.map(s=>`${s.label}: ${s.v}`).join(' → ');
+  const recentTrendLine=[
+    last10hist.length>=2?`Son 10 maç: ${recentDelta10>=0?'+':''}${recentDelta10} puan (${last10hist.join(' → ')})`:'',
+    last5hist.length>=2?`Son 5 maç: ${recentDelta5>=0?'+':''}${recentDelta5} puan (${last5hist.join(' → ')})`:'',
+  ].filter(Boolean).join('\n  ');
+
+  // form band: last 30, sequence string
+  const formSeq=(recentForForm||[]).map(m=>{
+    if(m.resultType==='walkover') return m.won?'WO↑':'WO↓';
+    if(m.resultType==='retirement') return m.won?'Ret↑':'Ret↓';
+    return m.won?'G':'M';
+  }).join(' ');
+  const last30=recentForForm||[];
+  const formWins=last30.filter(m=>m.won&&m.resultType==='completed').length;
+  const formLosses=last30.filter(m=>!m.won&&m.resultType==='completed').length;
+
+  // yearly breakdown
+  const yearlyLines=byYear?Object.entries(byYear).sort(([a],[b])=>a-b).map(([y,v])=>{
+    const tot=v.w+v.l; const p=Math.round(v.w/tot*100);
+    return `  ${y}: ${v.w}G / ${v.l}M (%${p})`;
+  }).join('\n'):'  Veri yok';
+
+  // age group distribution
+  const agDist={};
+  (d.recentMatches||[]).forEach(m=>{if(m.ageGroup)(agDist[m.ageGroup]=agDist[m.ageGroup]||{w:0,l:0})[m.won?'w':'l']++;});
+  const agLines=Object.entries(agDist).sort(([a],[b])=>a-b).map(([ag,v])=>`  ${ag} Yaş: ${v.w}G / ${v.l}M`).join('\n')||'  Veri yok';
+
+  // last 20 completed matches detail
+  const last20=d.recentMatches.filter(m=>m.resultType==='completed').slice(0,20).map((m,i)=>{
+    const res=m.won?'G':'M';
+    const oppRtg=m.opponentRating?` (rakip reyting: ${m.opponentRating})`:'';
+    return `  ${i+1}. ${res} · ${m.opponentName||'?'}${oppRtg} · ${m.score||'?'} · ${m.stage||'?'} · ${m.event||'?'} · ${m.date||'?'}`;
+  }).join('\n');
+
+  // walkover / retirement stats
+  const woWin=d.recentMatches.filter(m=>m.resultType==='walkover'&&m.won).length;
+  const woLoss=d.recentMatches.filter(m=>m.resultType==='walkover'&&!m.won).length;
+  const retWin=d.recentMatches.filter(m=>m.resultType==='retirement'&&m.won).length;
+  const retLoss=d.recentMatches.filter(m=>m.resultType==='retirement'&&!m.won).length;
+
+  // opponent rating analysis (completed matches with rating data)
+  const ratedMatches=d.recentMatches.filter(m=>m.resultType==='completed'&&m.opponentRating);
+  const playerElo=elo||1200;
+  // higher/lower rated totals + win/loss breakdown
+  const higherRated=ratedMatches.filter(m=>m.opponentRating>playerElo+50);
+  const lowerRated=ratedMatches.filter(m=>m.opponentRating<playerElo-50);
+  const upsetWins=higherRated.filter(m=>m.won).sort((a,b)=>b.opponentRating-a.opponentRating);
+  const upsetLosses=lowerRated.filter(m=>!m.won).sort((a,b)=>a.opponentRating-b.opponentRating);
+  const avgOppWin=ratedMatches.filter(m=>m.won).length?Math.round(ratedMatches.filter(m=>m.won).reduce((s,m)=>s+m.opponentRating,0)/ratedMatches.filter(m=>m.won).length):null;
+  const avgOppLoss=ratedMatches.filter(m=>!m.won).length?Math.round(ratedMatches.filter(m=>!m.won).reduce((s,m)=>s+m.opponentRating,0)/ratedMatches.filter(m=>!m.won).length):null;
+  const bestWin=upsetWins.length?upsetWins[0]:ratedMatches.filter(m=>m.won).sort((a,b)=>b.opponentRating-a.opponentRating)[0]||null;
+  const worstLoss=upsetLosses.length?upsetLosses[0]:null;
+  const oppRatingLines=`  Galibiyetlerde ort. rakip reytingi: ${avgOppWin||'—'}
+  Mağlubiyetlerde ort. rakip reytingi: ${avgOppLoss||'—'}
+  Üst sıradaki rakiplere karşı (rakip >${playerElo+50}): toplam ${higherRated.length} maç → ${upsetWins.length}G / ${higherRated.length-upsetWins.length}M
+  Alt sıradaki rakiplere karşı (rakip <${playerElo-50}): toplam ${lowerRated.length} maç → ${lowerRated.length-upsetLosses.length}G / ${upsetLosses.length}M${bestWin?`\n  En değerli galibiyet: ${bestWin.opponentName} (reyting: ${bestWin.opponentRating}) — ${bestWin.score}, ${bestWin.date}`:''}${worstLoss?`\n  En sürpriz mağlubiyet: ${worstLoss.opponentName} (reyting: ${worstLoss.opponentRating}) — ${worstLoss.score}, ${worstLoss.date}`:''}`;
+
+  // Elo loss context: losses within last 20 completed matches (not last 20 losses)
+  const last20completed=d.recentMatches.filter(m=>m.resultType==='completed').slice(0,20);
+  const recentLosses20=last20completed.filter(m=>!m.won&&m.opponentRating);
+  const expectedLosses=recentLosses20.filter(m=>m.opponentRating>playerElo+50);
+  const unexpectedLosses=recentLosses20.filter(m=>m.opponentRating<playerElo-50);
+  const eloLossContext=recentLosses20.length?
+    `  Son 20 tamamlanan maçtaki mağlubiyetler (${recentLosses20.length} adet):\n`+
+    `  - Beklenen (rakip >${playerElo+50}): ${expectedLosses.length} maç${expectedLosses.length?` — ${expectedLosses.map(m=>`${m.opponentName}(${m.opponentRating})`).join(', ')}`:''}\n`+
+    `  - Sürpriz (rakip <${playerElo-50}): ${unexpectedLosses.length} maç${unexpectedLosses.length?` — ${unexpectedLosses.map(m=>`${m.opponentName}(${m.opponentRating})`).join(', ')}`:''}\n`+
+    `  - Yakın seviye (±50): ${recentLosses20.length-expectedLosses.length-unexpectedLosses.length} maç`
+    :'  Son 20 tamamlanan maçta reyting verisi olan mağlubiyet yok';
+
+  // Score quality analysis — score is player-oriented: set.a=player, set.b=opponent
+  function parseSets(scoreStr){
+    if(!scoreStr) return [];
+    return scoreStr.trim().split(/\s+/).map(s=>{const p=s.split('-');return p.length===2?{a:+p[0],b:+p[1]}:null;}).filter(Boolean);
+  }
+  const completedWithScore=d.recentMatches.filter(m=>m.resultType==='completed'&&m.score);
+  const threeSetMatches=completedWithScore.filter(m=>parseSets(m.score).length>=3);
+  const mtbMatches=threeSetMatches.filter(m=>{const s=parseSets(m.score);const last=s[s.length-1];return last&&Math.max(last.a,last.b)>=8;});
+  const threeSetW=threeSetMatches.filter(m=>m.won).length, threeSetL=threeSetMatches.filter(m=>!m.won).length;
+  const mtbW=mtbMatches.filter(m=>m.won).length, mtbL=mtbMatches.filter(m=>!m.won).length;
+  // dominant: straight sets, every set won by ≥2 (set.a=player score)
+  const dominantWins=completedWithScore.filter(m=>{
+    if(!m.won) return false;
+    const s=parseSets(m.score); if(s.length!==2) return false;
+    return s.every(set=>set.a>set.b&&(set.a-set.b)>=3);
+  });
+  const closeWins=completedWithScore.filter(m=>{
+    if(!m.won) return false;
+    const s=parseSets(m.score); if(!s.length) return false;
+    if(s.length>=3) return true;
+    return s.some(set=>Math.abs(set.a-set.b)<=1);
+  });
+  const dominantLosses=completedWithScore.filter(m=>{
+    if(m.won) return false;
+    const s=parseSets(m.score); if(s.length!==2) return false;
+    return s.every(set=>set.b>set.a&&(set.b-set.a)>=3);
+  });
+  const scoreQualityLines=
+    `  Toplam tamamlanan (skor verisi olan): ${completedWithScore.length} maç\n`+
+    `  3. set / MTB'ye giden: ${threeSetMatches.length} maç → ${threeSetW}G / ${threeSetL}M\n`+
+    `  Match Tie-Break rekoru: ${mtbW}G / ${mtbL}M (toplam ${mtbMatches.length} MTB)\n`+
+    `  Dominant galibiyet (düz setler, ≥2 set farkı): ${dominantWins.length}\n`+
+    `  Yakın galibiyet (3. set veya ≤1 fark): ${closeWins.length}\n`+
+    `  Dominant mağlubiyet (düz setler, her iki sette oyun farkı ≥3): ${dominantLosses.length}`;
+
+  return `Sen deneyimli bir Türk junior tenis analisti ve antrenör danışmanısın. Aşağıdaki oyuncunun tüm istatistik veritabanını inceleyerek kapsamlı bir gelişim raporu hazırla. Türkçe yaz. Somut veri varsa sayıları kullan, yoksa "veri yetersiz" de. Her bölümde önce **"Veriden Çıkan Bulgular"**, ardından **"Analistin Yorumu"** başlığı kullan; veri ile yorumu karıştırma. Oyun stili gibi çıkarımlarda ve gelecek projeksiyonunda güven seviyesini düşük/orta/yüksek olarak belirt.
+
+## KİMLİK
+- İsim: ${name}
+- ${age}${gender?' · '+gender:''}
+- Kulüp: ${club||'Bilinmiyor'}${city?' · Şehir: '+city:''}
+- Yaş Grubu (en yüksek): ${ageGroup?ageGroup+' Yaş':'—'}
+
+## ELO REYTİNG & SIRALAMA
+- Güncel Elo: ${elo||'—'} ${ratingTrend?'(kariyer geneli '+ratingTrend+')':''} ${peakDiff}
+- Kariyer yayı: ${ratingProgressLine||`${firstRating||'—'} → Zirve: ${peak||'—'} → Güncel: ${elo||'—'}`}
+- Kısa vade trendi:
+  ${recentTrendLine||'Yeterli veri yok'}
+- Genel Sıralama: #${overallRank||'—'} · Cinsiyet: #${genderRank||'—'} · Yaş Grubu: #${agRank||'—'}
+
+## KARİYER MAÇ İSTATİSTİKLERİ
+- Toplam tamamlanan: ${wins}G / ${losses}M · %${pct} kazanma
+- Toplam maç: ${d.totalMatches} (W.O. galip: ${woWin} · W.O. mağlup: ${woLoss} · Abandoned galip: ${retWin} · Abandoned mağlup: ${retLoss})
+
+## YILLIK GELİŞİM
+${yearlyLines}
+
+## YAŞ GRUBUNA GÖRE DAĞILIM
+${agLines}
+
+## SON FORM (son ${last30.length} maç, kronolojik)
+Sıra: ${formSeq||'—'}
+Tamamlanan maçlarda: ${formWins}G / ${formLosses}M
+
+## SON 20 TAMAMLANAN MAÇ (en yeni → eski)
+Her satır: sonuç · rakip adı (maç tarihindeki reytingi) · skor · aşama · turnuva türü · tarih
+${last20||'  Veri yok'}
+
+## RAKİP REYTİNG ANALİZİ
+${oppRatingLines}
+
+## ELO KAYIP BAĞLAMI (son 20 maç mağlubiyetleri)
+${eloLossContext}
+
+## SKOR KALİTESİ ANALİZİ
+${scoreQualityLines}
+
+---
+## RAPORLAMA KURALLARI
+
+Bu raporun amacı verileri özetlemek değil, veri destekli içgörüler üretmektir.
+
+**Zorunlu kurallar:**
+- Verilmeyen verileri varsayma. Eksik veri varsa "veri yetersiz" yaz.
+- Teknik seviye, forehand, backhand, servis kalitesi, fiziksel kapasite ve taktik tercihleri hakkında veri yoksa yorum yapma.
+- Aynı istatistiği farklı bölümlerde tekrar etme.
+- Kesin konuşma yerine olasılık dili kullan.
+- Her ana bölümde en fazla 3 kritik Kanıt → Sonuç kullan. Her cümleyi bu formata sokma.
+- Veriden çıkmayan yorum yapma; kanıt yoksa yorum yapma.
+
+**Kanıt/Sonuç formatı** (yalnızca kritik bulgular için):
+Kanıt: [ilgili veri]
+Sonuç: [yorum]
+
+**ÖNCE ANALİZ, SONRA SONUÇ:**
+- Her bölümde önce veriyi incele, sonra yorum yap. Veriyi tekrar etmek analiz sayılmaz.
+- Her bölümde en az 1 dikkat çekici veya beklenmedik bulgu belirt.
+- Eğer bölümde anlamlı içgörü üretemiyorsan "bu bölüm için yeterli veri yok" yaz.
+- Amaç istatistikleri yeniden yazmak değil, oyuncu hakkında veri destekli içgörü üretmektir.
+
+**ZORUNLU MANTIK KONTROLÜ** (ön teşhislerden önce uygula):
+1. Oyuncu kendisinden ≥250 Elo yüksek rakibi yenmişse → "Tavan performans eksikliği" teşhisi koyamazsın; koyacaksan bu galibiyetin neden istisna olduğunu açıkla.
+2. MTB veya karar seti galibiyet oranı %60+ ise → "Mental eksiklik / baskı altında oynayamama" teşhisi koyamazsın; koyacaksan bu oranların neden yanıltıcı olduğunu açıkla.
+3. Hem çok güçlü rakibi yenmişse hem de belirgin şekilde zayıf rakibe kaybetmişse → "İstikrar eksikliği" seçeneğini öncelikli değerlendirmek zorundasın.
+Bu üç kuraldan biriyle çelişen sonuç üretirsen teşhisi yeniden değerlendir.
+
+**ÇELİŞKİ TESTİ:**
+Aşağıdaki durumlarda çelişen veriyi önce açıklamadan o teşhise ulaşma:
+- MTB galibiyet oranı %60+ veya karar seti galibiyet oranı %60+ ise → "mental eksiklik / baskı altında dağılma" teşhisi koyma veya çelişkiyi açıkla.
+- Oyuncu kendisinden belirgin şekilde yüksek reytingli rakipler yenebiliyorsa → "tavan performans eksikliği" teşhisi koyma veya çelişkiyi açıkla.
+Veri çelişiyorsa o yorumu yapma.
+
+**OYUN STİLİ KISITI:** Winner, unforced error, servis yüzdesi veya taktik veri yoksa "agresif / kontraatakçı / defansif / file oyuncusu / hücumcu" gibi stil tanımları yapma. Sadece mücadele profili, maç yönetimi profili, baskı altındaki davranış profili ve geri dönüş kapasitesi hakkında yorum yap.
+
+**ÖNCELİKLİ SORULAR** — Raporun merkezinde şu sorular olsun:
+- Oyuncunun gelişimini en çok sınırlayan faktör nedir?
+- Oyuncunun en büyük rekabet avantajı nedir?
+- Oyuncunun problemi tavan performans mı, taban performans mı?
+- Önümüzdeki 6 ayda en yüksek getirili gelişim alanı nedir?
+
+---
+## ZORUNLU ÖN TEŞHİSLER
+
+Raporu yazmadan önce aşağıdaki üç teşhisi yap. Her biri için Kanıt → Sonuç formatını kullan. Bu teşhisler raporun merkezinde olsun — sonraki tüm bölümler bu teşhisleri destekler veya sorgulamalı.
+
+**Teşhis 1 — Oyuncunun temel problemi:**
+Sadece birini seç: Tavan performans eksikliği / İstikrar eksikliği / Baskı altında performans eksikliği / Veri yetersiz
+Kanıt: [destekleyen veriler]
+Sonuç: [neden bu seçim]
+
+**Teşhis 2 — Oyuncunun en büyük rekabet avantajı:**
+Sadece birini seç: Güçlü rakipleri yenebilme kapasitesi / İstikrar / Baskı altında performans / Zayıf rakiplere karşı hata yapmama / Veri yetersiz
+Kanıt: [destekleyen veriler]
+Sonuç: [neden bu seçim]
+
+**Teşhis 3 — Önümüzdeki 6 ayda en yüksek getirili gelişim alanı:**
+Sadece birini seç: Daha güçlü rakiplerle oynamak / İstikrarı artırmak / Mental performans / Teknik gelişim / Veri yetersiz
+Kanıt: [destekleyen veriler]
+Sonuç: [neden bu seçim]
+
+---
+## GELİŞİM RAPORU TALEBİ
+
+Aşağıdaki her başlık için ayrı bölüm yaz. Her bölümde önce **Veriden Çıkan Bulgular**, ardından **Analistin Yorumu**:
+
+**0. Yönetici Özeti**
+8-10 satırda özetle: bugünkü seviye, son 12 aydaki gelişim, en güçlü özellik, en kritik gelişim alanı, 12 aylık genel görünüm. Raporun tamamını okumaya vakti olmayan biri için.
+
+**1. Genel Profil & Seviye Tespiti**
+Oyuncuyu şu seviyelerden en uygununa yerleştir: İl düzeyi / Bölgesel güçlü / Ulusal rekabetçi / Ulusal üst düzey / Milli takım adayı.
+Ardından iki soruyu yanıtla:
+- "Neden bir üst kategori değil?" (kanıtla destekle)
+- "Neden bir alt kategori değil?" (kanıtla destekle)
+
+**2. Reyting Trendi & Elo Bağlamı**
+Kariyer yayını yorumla. Kısa vade deltasını değerlendir. Elo kayıplarının ne kadarının beklenen (güçlü rakip) ne kadarının performans düşüşünden kaynaklandığını analiz et.
+
+**3. Skor Kalitesi & Maç Yönetimi Profili**
+Dominant vs yakın galibiyetler, MTB rekoru ve 3. set performansını değerlendir. Oyun stili kısıtına uy; mücadele profili, baskı altındaki davranış ve geri dönüş kapasitesi hakkında yorum yap. Güven seviyesini belirt.
+
+**4. Kritik Maç (Clutch) Performansı**
+Match Tie-Break ve 3. set rekoruna bak. Baskı altında performans hakkında çıkarım yap. Bu yaş grubunda mental dayanıklılık teknik seviyeden bazen daha önemlidir.
+
+**5. Rakip Kalitesi & Maç Değeri**
+Galibiyetlerde ve mağlubiyetlerde ortalama rakip reytingini yorumla. En değerli galibiyeti ve en sürpriz mağlubiyeti Kanıt/Sonuç formatında değerlendir.
+
+**6. Güçlü Yönler & Gelişim Alanları**
+Verilerden çıkarılan somut güçlü ve zayıf taraflar. Her madde için kanıt yaz.
+
+**6A. Tavan ve Taban Performans Analizi**
+- Tavan seviyesi: en güçlü rakibe karşı performans ne söylüyor?
+- Ortalama seviye: tipik maç profili nedir?
+- Taban seviyesi: sürpriz mağlubiyetler ne sıklıkla ve kime karşı?
+**Nihai Teşhis** — Sadece bir seçenek seç, kararsız kalma:
+Seviye eksikliği / İstikrar eksikliği / Mental eksiklik / Veri yetersiz
+Gerekçeyi şu formatta yaz:
+Kanıt: [destekleyen veriler]
+Sonuç: [neden bu faktör en kritik sınırlayıcı unsurdur]
+
+**6B. Mağlubiyet Nedenleri Analizi**
+Mevcut veriye dayanarak mağlubiyetleri şu kategorilere ayır (yaklaşık oran, gerekçe ile):
+- Rakip belirgin şekilde daha iyi: ~%X
+- Kritik anların kaybedilmesi: ~%X
+- İstikrarsız performans: ~%X
+- Veri yetersiz: ~%X
+
+**7. Gelecek Projeksiyonu**
+NOT: Bu oyuncu için uzun vadeli tahminlerde belirsizlik yüksektir; mevcut sonuçlardan profesyonel kariyer veya milli takım geleceği hakkında kesin çıkarım yapma. Sadece kısa ve orta vadeli olasılıkları değerlendir.
+Her senaryo için zorunlu olarak:
+- Dayandığı veriler
+- Varsayımlar
+- Güven seviyesi (düşük/orta/yüksek)
+
+Senaryolar: güçlü / beklenen / zayıf. Elo tahminine ek olarak Türkiye rekabeti içinde konum değişimini yaz.
+
+**8. Turnuva & Antrenman Stratejisi**
+İki ayrı hedef için ayrı yaz:
+a) Elo koruma/artırma: ideal rakip reytingi bandı
+b) Oyuncu gelişimini hızlandırma: turnuva türü ve rakip profili
+Önümüzdeki 6 ay için somut öneri.
+
+**9. Kırmızı Bayraklar**
+Verilerde görülen ve uzun vadeli gelişimi sınırlayabilecek riskler.
+
+**10. Aile İçin Kısa Özet**
+Teknik olmayan, sade dil. 5 maddede:
+- Bu oyuncu bugün nerede?
+- En güçlü tarafı ne?
+- En acil gelişim alanı ne?
+- Önümüzdeki 6 ayda neye odaklanılmalı?
+- Genel potansiyel değerlendirmesi.
+
+**11. 6 Aylık Aksiyon Planı (Antrenör İçin)**
+- Teknik öncelik
+- Taktik öncelik
+- Mental öncelik
+- Turnuva planı
+- Ölçülecek 3 KPI — sonuç odaklı ve ölçülebilir olmalı (örnek format: "MTB galibiyet oranını %70 üzerinde tutmak", "1520 altı rakiplere karşı mağlubiyet oranını %20 altına indirmek")
+
+**12. Eğer Bu Oyuncu Benim Öğrencim Olsaydı**
+Sadece 3 madde, kısa ve net:
+1. Yarın sabah değiştireceğim ilk şey
+2. Önümüzdeki 3 ay boyunca en büyük odak noktam
+3. Kesinlikle bozmayacağım güçlü yön
+
+**13. Tek Cümlelik Hüküm**
+En fazla 50 kelime. "Bu oyuncu şu anda nerede ve önündeki en büyük fırsat nedir?" sorusunu yanıtla. Raporun tamamını tek paragrafta özetle.`;
 }
 
 // ---------- H2H ----------

@@ -24,3 +24,6 @@ work/ikort_players_cache/
 # Secrets — never commit session cookies
 work/ikort_cookies.txt
 work/*.txt
+
+# Local API config — never commit
+work/web/config.js
