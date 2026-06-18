@@ -123,6 +123,7 @@
   .brand--mobile{display:none}
   .theme-btn--mobile{display:none}
   .search{position:relative;margin-left:auto;width:340px;max-width:46vw}
+  .search-toggle{display:none}
   .search input{width:100%;background:var(--panel);border:1px solid var(--line);color:var(--txt);
     padding:11px 14px 11px 38px;border-radius:11px;outline:none;font:inherit;font-size:16px;
     transition:border-color .15s,box-shadow .15s}
@@ -277,7 +278,10 @@
     .topbar{padding:11px 16px}
     .brand--mobile{display:flex;margin:0;font-size:20px}
     .theme-btn--mobile{display:flex;width:auto;padding:9px 11px;font-size:15px}
-    .search{width:auto;flex:1;margin-left:8px;max-width:none}
+    .search{display:none}
+    .search.open{display:block;position:absolute;left:10px;right:10px;top:8px;width:auto;margin:0;max-width:none;z-index:45}
+    .search-toggle{display:inline-flex;align-items:center;justify-content:center;min-width:42px;height:38px;margin-left:auto;
+      background:var(--panel2);border:1px solid var(--line);color:var(--txt2);border-radius:10px;cursor:pointer;font-size:16px}
     .club-grid{grid-template-columns:1fr!important}
     main{padding:22px 16px 96px}
     h1{font-size:25px} h2{font-size:16px;margin:26px 0 12px}
@@ -328,6 +332,7 @@
         <input id="q" placeholder="Oyuncu / kulüp ara…" autocomplete="off">
         <div class="results" id="sr"></div>
       </div>
+      <button class="search-toggle" type="button" onclick="openMobileSearch()" aria-label="Ara">🔍</button>
       <div class="pal-seg" id="palSeg">
         <button type="button" data-pal="clay" onclick="setPalette('clay')" title="Toprak"><span class="dot" style="background:#b9542a"></span></button>
         <button type="button" data-pal="grass" onclick="setPalette('grass')" title="Çim"><span class="dot" style="background:#1f8a3b"></span></button>
@@ -795,7 +800,7 @@ async function home(){
     <h2 style="margin:0 0 14px;font-size:16px">En genç yetenekler <span class="muted" style="font-size:12px;font-weight:400">en küçük yaş, en yüksek Elo</span></h2>
     ${ins.youngTalents.map((p,i)=>`<a href="#/player/${p.player_id}" style="display:flex;align-items:center;gap:10px;padding:8px 0;border-top:${i?'1px solid var(--line)':'none'}">
       <span style="padding:2px 7px;border-radius:7px;background:var(--accent2-soft);color:var(--accent2);font-size:11px;font-weight:700;flex-shrink:0">${p.birth_year}</span>
-      <span style="flex:1;font-weight:600;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.name)}</span>
+      <span style="flex:1;min-width:0;font-weight:600;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.name)}</span>
       <span class="muted" style="font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:90px">${esc(p.club_name||'')}</span>
       <span class="rating" style="font-size:13px;flex-shrink:0">${Math.round(p.rating)}</span>
     </a>`).join('')}
@@ -826,7 +831,7 @@ async function home(){
     <h2 style="margin:0 0 14px;font-size:16px">Şehir dağılımı <span class="muted" style="font-size:12px;font-weight:400">oyuncu sayısı</span></h2>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:4px 24px">
     ${ins.cities.map(c=>`<div style="display:flex;align-items:center;gap:10px;padding:6px 0">
-      <span style="flex:1;font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.city)}</span>
+      <span style="flex:1;min-width:0;font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.city)}</span>
       <div style="width:90px;height:7px;border-radius:4px;background:var(--panel2);overflow:hidden;flex-shrink:0"><div style="height:100%;width:${Math.round(c.n/cityMax*100)}%;background:var(--accent)"></div></div>
       <span class="muted" style="font-family:var(--font-mono);font-size:12px;min-width:42px;text-align:right">${c.n.toLocaleString('tr')}</span>
     </div>`).join('')}
@@ -2006,8 +2011,11 @@ $('#q').addEventListener('input',e=>{clearTimeout(st);const v=e.target.value.tri
     if(d.players.length){h+='<div class="cat">Oyuncular</div>'+d.players.map(p=>`<div class="r" onclick="go('#/player/${p.player_id}')"><span>${esc(p.name)}</span><span class="muted">${p.age_group?p.age_group+'Y ':''}${Math.round(p.rating)}</span></div>`).join('');}
     if(d.clubs.length){h+='<div class="cat">Kulüpler</div>'+d.clubs.map(c=>`<div class="r" onclick="go('#/rankings?club_id=${c.club_id}')"><span>${esc(c.name)}</span><span class="muted">${esc(c.city||'')}</span></div>`).join('');}
     $('#sr').innerHTML=h||'<div class="r muted">sonuç yok</div>';$('#sr').classList.add('show');},200);});
-document.addEventListener('click',e=>{if(!e.target.closest('.search'))$('#sr').classList.remove('show');});
-window.go=h=>{$('#q').value='';$('#sr').classList.remove('show');location.hash=h;};
+document.addEventListener('click',e=>{if(!e.target.closest('.search')&&!e.target.closest('.search-toggle')){$('#sr').classList.remove('show');$('.search')?.classList.remove('open');}});
+window.openMobileSearch=()=>{const s=$('.search');s.classList.add('open');const i=$('#q');i.focus();};
+$('#q').addEventListener('blur',()=>setTimeout(()=>{if(window.innerWidth<=980&&!$('#sr').classList.contains('show'))$('.search').classList.remove('open');},200));
+$('#q').addEventListener('keydown',e=>{if(e.key==='Escape'){$('#sr').classList.remove('show');$('.search').classList.remove('open');$('#q').blur();}});
+window.go=h=>{$('#q').value='';$('#sr').classList.remove('show');$('.search')?.classList.remove('open');location.hash=h;};
 
 // ---------- router ----------
 function qs(o){const p=Object.entries(o).filter(([,v])=>v!=='').map(([k,v])=>k+'='+encodeURIComponent(v));return p.length?'?'+p.join('&'):'';}
