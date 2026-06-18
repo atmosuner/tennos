@@ -283,6 +283,7 @@
     .search-toggle{display:inline-flex;align-items:center;justify-content:center;min-width:42px;height:38px;margin-left:auto;
       background:var(--panel2);border:1px solid var(--line);color:var(--txt2);border-radius:10px;cursor:pointer;font-size:16px}
     .club-grid{grid-template-columns:1fr!important}
+    .rec-grid{grid-template-columns:repeat(2,1fr)!important}
     main{padding:22px 16px 96px}
     h1{font-size:25px} h2{font-size:16px;margin:26px 0 12px}
     .profile-info,.profile-score{padding:18px}
@@ -485,7 +486,14 @@ syncPalBtns();
         peak:one(`SELECT player_id,name,round(peak_rating) v FROM player_ratings WHERE ${af()} ORDER BY peak_rating DESC LIMIT 1`),
         mostMatches:one(`SELECT player_id,name,matches v FROM player_ratings WHERE ${af()} ORDER BY matches DESC LIMIT 1`),
         youngest:one(`SELECT player_id,name,birth_year v,round(rating) rating FROM player_ratings WHERE matches>=5 AND birth_year IS NOT NULL AND ${af()} ORDER BY birth_year DESC,rating DESC LIMIT 1`),
-        bestPct:one(`SELECT player_id,name,wins,losses,round(wins*100.0/matches) v FROM player_ratings WHERE matches>=30 AND ${af()} ORDER BY wins*1.0/matches DESC LIMIT 1`)};
+        bestPct:one(`SELECT player_id,name,wins,losses,round(wins*100.0/matches) v FROM player_ratings WHERE matches>=30 AND ${af()} ORDER BY wins*1.0/matches DESC LIMIT 1`),
+        mostTournaments:one(`WITH pt AS (SELECT player_id,count(DISTINCT tournament_id) v FROM (SELECT winner_id player_id,tournament_id FROM matches WHERE winner_id IS NOT NULL AND tournament_id IS NOT NULL UNION ALL SELECT loser_id player_id,tournament_id FROM matches WHERE loser_id IS NOT NULL AND tournament_id IS NOT NULL) GROUP BY player_id)
+          SELECT pr.player_id,pr.name,pt.v FROM player_ratings pr JOIN pt ON pt.player_id=pr.player_id WHERE ${af('pr.')} ORDER BY pt.v DESC LIMIT 1`),
+        biggestRise:(()=>{const r=one(`WITH h AS (SELECT player_id,rating_after,SUBSTR(match_date,7,4)||SUBSTR(match_date,4,2)||SUBSTR(match_date,1,2) dk FROM player_rating_history WHERE SUBSTR(match_date,7,4)||SUBSTR(match_date,4,2)||SUBSTR(match_date,1,2)>='${acs}'),
+          strt AS (SELECT player_id,count(*) c,MIN(dk) mindk FROM h GROUP BY player_id)
+          SELECT pr.player_id,pr.name,CAST(round(pr.rating-(SELECT rating_after FROM h WHERE h.player_id=strt.player_id AND h.dk=strt.mindk LIMIT 1)) AS INTEGER) v
+          FROM strt JOIN player_ratings pr ON pr.player_id=strt.player_id WHERE strt.c>=5 AND ${af('pr.')} ORDER BY v DESC LIMIT 1`);
+          if(r&&r.v!=null) r.v=(r.v>0?'+':'')+r.v; return r;})()};
       const topClubs=Q(`SELECT club_id,club_name,sum(wins) w,sum(losses) l,round(sum(wins)*100.0/(sum(wins)+sum(losses))) pct,count(*) n FROM player_ratings WHERE club_id IS NOT NULL AND club_name<>'' AND matches>=5 AND ${af()} GROUP BY club_id HAVING n>=20 AND (w+l)>0 ORDER BY pct DESC LIMIT 8`);
       const maxBirth=scalar(`SELECT MAX(birth_year) FROM player_ratings WHERE matches>=5 AND ${af()}`);
       const youngTalents=Q(`SELECT player_id,name,birth_year,rating,club_name FROM player_ratings WHERE birth_year>=? AND matches>=5 AND ${af()} ORDER BY rating DESC LIMIT 10`,[maxBirth-1]);
@@ -778,11 +786,13 @@ async function home(){
     ${sub?`<div style="color:var(--dim);font-size:11.5px;margin-top:2px">${sub}</div>`:''}
   </a>`:'';
   const records=`${h2line('Rekor kitabı')}
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;margin-bottom:8px">
+    <div class="rec-grid" style="display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:8px">
       ${recItem('En yüksek zirve',rec.peak,'zirve Elo')}
       ${recItem('En çok maç',rec.mostMatches,'kariyer maçı')}
       ${recItem('En iyi galibiyet %',rec.bestPct,rec.bestPct?`${rec.bestPct.wins}-${rec.bestPct.losses} · min 30 maç`:'')}
       ${recItem('En genç reytingli',rec.youngest,rec.youngest?`doğumlu · ${rec.youngest.rating} Elo`:'')}
+      ${recItem('En büyük yükseliş',rec.biggestRise,'son 12 ay')}
+      ${recItem('En çok turnuva',rec.mostTournaments,'farklı turnuva')}
     </div>`;
   // --- Kulüp güç sıralaması ---
   const topClubs=`<div style="${pcard}">
