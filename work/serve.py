@@ -238,6 +238,9 @@ class Handler(BaseHTTPRequestHandler):
         many = lambda sql, p=(): rows_to_dicts(conn.execute(sql, p).fetchall())
         scal = lambda sql, p=(): conn.execute(sql, p).fetchone()[0]
         MONTHS = ["", "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
+        from datetime import date, timedelta
+        acs = (date.today() - timedelta(days=365)).strftime("%Y%m%d")
+        af = lambda p="": (f"SUBSTR({p}last_match_date,7,4)||SUBSTR({p}last_match_date,4,2)||SUBSTR({p}last_match_date,1,2)>='{acs}'")
         year = scal("SELECT MAX(SUBSTR(match_date,7,4)) FROM matches WHERE match_date<>''") or ""
         yf = "SUBSTR(match_date,7,4)=?"
         busiest = one(f"SELECT SUBSTR(match_date,4,2) mo,count(*) n FROM matches WHERE {yf} AND match_date<>'' GROUP BY mo ORDER BY n DESC LIMIT 1", (year,))
@@ -251,26 +254,22 @@ class Handler(BaseHTTPRequestHandler):
             "topCategory": f"{top_cat['age_group']} Yaş {top_cat['gender']}" if top_cat else "—",
         }
         records = {
-            "peak": one("SELECT player_id,name,round(peak_rating) v FROM player_ratings ORDER BY peak_rating DESC LIMIT 1"),
-            "mostMatches": one("SELECT player_id,name,matches v FROM player_ratings ORDER BY matches DESC LIMIT 1"),
-            "youngest": one("SELECT player_id,name,birth_year v,round(rating) rating FROM player_ratings WHERE matches>=5 AND birth_year IS NOT NULL ORDER BY birth_year DESC,rating DESC LIMIT 1"),
-            "bestPct": one("SELECT player_id,name,wins,losses,round(wins*100.0/matches) v FROM player_ratings WHERE matches>=30 ORDER BY wins*1.0/matches DESC LIMIT 1"),
-            "mostTitles": one("SELECT winner_id player_id,count(*) v FROM matches WHERE stage='Final' AND winner_id IS NOT NULL GROUP BY winner_id ORDER BY v DESC LIMIT 1"),
+            "peak": one(f"SELECT player_id,name,round(peak_rating) v FROM player_ratings WHERE {af()} ORDER BY peak_rating DESC LIMIT 1"),
+            "mostMatches": one(f"SELECT player_id,name,matches v FROM player_ratings WHERE {af()} ORDER BY matches DESC LIMIT 1"),
+            "youngest": one(f"SELECT player_id,name,birth_year v,round(rating) rating FROM player_ratings WHERE matches>=5 AND birth_year IS NOT NULL AND {af()} ORDER BY birth_year DESC,rating DESC LIMIT 1"),
+            "bestPct": one(f"SELECT player_id,name,wins,losses,round(wins*100.0/matches) v FROM player_ratings WHERE matches>=30 AND {af()} ORDER BY wins*1.0/matches DESC LIMIT 1"),
         }
-        if records["mostTitles"]:
-            nm = one("SELECT name FROM player_ratings WHERE player_id=?", (records["mostTitles"]["player_id"],)) or one("SELECT name FROM players WHERE player_id=?", (records["mostTitles"]["player_id"],))
-            records["mostTitles"]["name"] = nm["name"] if nm else None
-        top_clubs = many("SELECT club_id,club_name,sum(wins) w,sum(losses) l,round(sum(wins)*100.0/(sum(wins)+sum(losses))) pct,count(*) n FROM player_ratings WHERE club_id IS NOT NULL AND club_name<>'' AND matches>=5 GROUP BY club_id HAVING n>=20 AND (w+l)>0 ORDER BY pct DESC LIMIT 8")
-        max_birth = scal("SELECT MAX(birth_year) FROM player_ratings WHERE matches>=5")
-        young_talents = many("SELECT player_id,name,birth_year,rating,club_name FROM player_ratings WHERE birth_year>=? AND matches>=5 ORDER BY rating DESC LIMIT 10", (max_birth - 1,))
+        top_clubs = many(f"SELECT club_id,club_name,sum(wins) w,sum(losses) l,round(sum(wins)*100.0/(sum(wins)+sum(losses))) pct,count(*) n FROM player_ratings WHERE club_id IS NOT NULL AND club_name<>'' AND matches>=5 AND {af()} GROUP BY club_id HAVING n>=20 AND (w+l)>0 ORDER BY pct DESC LIMIT 8")
+        max_birth = scal(f"SELECT MAX(birth_year) FROM player_ratings WHERE matches>=5 AND {af()}")
+        young_talents = many(f"SELECT player_id,name,birth_year,rating,club_name FROM player_ratings WHERE birth_year>=? AND matches>=5 AND {af()} ORDER BY rating DESC LIMIT 10", (max_birth - 1,))
         upsets = many(
-            """SELECT m.winner_id,wr.name wn,round(wr.rating) wrating,m.loser_id,lr.name ln,round(lr.rating) lrating,round(lr.rating-wr.rating) gap,m.match_date,m.event
+            f"""SELECT m.winner_id,wr.name wn,round(wr.rating) wrating,m.loser_id,lr.name ln,round(lr.rating) lrating,round(lr.rating-wr.rating) gap,m.match_date,m.event
                FROM matches m JOIN player_ratings wr ON wr.player_id=m.winner_id JOIN player_ratings lr ON lr.player_id=m.loser_id
-               WHERE m.result_type='completed' AND wr.matches>=10 AND lr.matches>=10 AND lr.rating-wr.rating>0
+               WHERE m.result_type='completed' AND wr.matches>=10 AND lr.matches>=10 AND {af('wr.')} AND {af('lr.')} AND lr.rating-wr.rating>0
                ORDER BY gap DESC LIMIT 6"""
         )
-        cohorts = many("SELECT birth_year,round(avg(rating)) avg,count(*) n FROM player_ratings WHERE birth_year IS NOT NULL AND matches>=5 GROUP BY birth_year HAVING n>=20 ORDER BY birth_year DESC LIMIT 8")
-        cities = many("SELECT city,count(*) n FROM players WHERE city<>'' AND city IS NOT NULL GROUP BY city ORDER BY n DESC LIMIT 10")
+        cohorts = many(f"SELECT birth_year,round(avg(rating)) avg,count(*) n FROM player_ratings WHERE birth_year IS NOT NULL AND matches>=5 AND {af()} GROUP BY birth_year HAVING n>=20 ORDER BY birth_year DESC LIMIT 8")
+        cities = many(f"SELECT p.city,count(*) n FROM player_ratings pr JOIN players p ON p.player_id=pr.player_id WHERE p.city<>'' AND p.city IS NOT NULL AND {af('pr.')} GROUP BY p.city ORDER BY n DESC LIMIT 10")
         return {"season": season, "records": records, "topClubs": top_clubs, "youngTalents": young_talents, "upsets": upsets, "cohorts": cohorts, "cities": cities}
 
     def api_rankings(self, conn, q):
