@@ -43,8 +43,8 @@ export default {
       body: JSON.stringify({
         model: MODEL,
         messages: [{ role: "user", content: prompt }],
-        temperature: 0.7,
-        max_tokens: 2048,
+        temperature: 0.4,
+        max_tokens: 1200,
       }),
     });
     const text = await groq.text();

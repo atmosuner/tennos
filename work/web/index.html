@@ -1332,7 +1332,7 @@ function buildAiPrompt(id,d,byYear,recentForForm){
     `  Yakın galibiyet (3. set veya ≤1 fark): ${closeWins.length}\n`+
     `  Dominant mağlubiyet (düz setler, her iki sette oyun farkı ≥3): ${dominantLosses.length}`;
 
-  return `Sen deneyimli bir Türk junior tenis analisti ve antrenör danışmanısın. Aşağıdaki oyuncunun tüm istatistik veritabanını inceleyerek kapsamlı bir gelişim raporu hazırla. Türkçe yaz. Somut veri varsa sayıları kullan, yoksa "veri yetersiz" de. Her bölümde önce **"Veriden Çıkan Bulgular"**, ardından **"Analistin Yorumu"** başlığı kullan; veri ile yorumu karıştırma. Oyun stili gibi çıkarımlarda ve gelecek projeksiyonunda güven seviyesini düşük/orta/yüksek olarak belirt.
+  return `Sen kıdemli bir Türk junior tenis analistisin. Aşağıdaki veriye bakıp KISA, DÜRÜST, nokta-atışı bir değerlendirme yaz. Övgü, dolgu cümle, klişe yok. Aynı sayıyı/bulguyu iki kez kullanma. Yalnızca aşağıdaki veriden konuş; teknik/oyun stili (forehand, servis, agresif/defansif vb.) verisi yok, onlara girme. Veri yoksa kısaca "veri yok" de, uydurma. Toplam ~350 kelimeyi geçme.
 
 ## KİMLİK
 - İsim: ${name}
@@ -1375,155 +1375,36 @@ ${eloLossContext}
 ${scoreQualityLines}
 
 ---
-## RAPORLAMA KURALLARI
+## ÖNEMLİ MANTIK NOTLARI (uy, ama tekrar etme)
+- "%100 kazanma + güçlü rakip (>kendi Elo'su) yok" ise: bunun anlamı tavanın EKSİK değil, ÖLÇÜLMEMİŞ olmasıdır. "Tavan performans eksikliği" deme; "tavan henüz test edilmedi" de.
+- MTB / karar seti galibiyet oranı yüksekse "mental zayıf" deme.
+- Hiç anlamlı mağlubiyet yoksa istikrar zaten kanıtlı; uzun uzun övme, bir kez söyle geç.
+- Skor/sonuç verisinden oyun stili çıkmaz; çıkarsama yapma.
 
-Bu raporun amacı verileri özetlemek değil, veri destekli içgörüler üretmektir.
+## ÇIKTI FORMATI (tam olarak bu başlıklar, bu sıra, kısa tut)
 
-**Zorunlu kurallar:**
-- Verilmeyen verileri varsayma. Eksik veri varsa "veri yetersiz" yaz.
-- Teknik seviye, forehand, backhand, servis kalitesi, fiziksel kapasite ve taktik tercihleri hakkında veri yoksa yorum yapma.
-- Aynı istatistiği farklı bölümlerde tekrar etme.
-- Kesin konuşma yerine olasılık dili kullan.
-- Her ana bölümde en fazla 3 kritik Kanıt → Sonuç kullan. Her cümleyi bu formata sokma.
-- Veriden çıkmayan yorum yapma; kanıt yoksa yorum yapma.
+**Hüküm**
+1-2 cümle: oyuncu bugün nerede + önündeki tek en büyük fırsat.
 
-**Kanıt/Sonuç formatı** (yalnızca kritik bulgular için):
-Kanıt: [ilgili veri]
-Sonuç: [yorum]
+**Seviye**
+Tek etiket seç (İl düzeyi / Bölgesel güçlü / Ulusal rekabetçi / Ulusal üst düzey / Milli takım adayı) + tek cümle gerekçe (sıralama + rakip Elo bandı ile).
 
-**ÖNCE ANALİZ, SONRA SONUÇ:**
-- Her bölümde önce veriyi incele, sonra yorum yap. Veriyi tekrar etmek analiz sayılmaz.
-- Her bölümde en az 1 dikkat çekici veya beklenmedik bulgu belirt.
-- Eğer bölümde anlamlı içgörü üretemiyorsan "bu bölüm için yeterli veri yok" yaz.
-- Amaç istatistikleri yeniden yazmak değil, oyuncu hakkında veri destekli içgörü üretmektir.
+**3 Net Tespit**
+Veriden çıkan en çarpıcı 3 bulgu. Her biri tek satır, şu formatta:
+- Kanıt → Sonuç
+(Sıradan/beklenen şeyleri yazma; sadece dikkat çekici olanı.)
 
-**ZORUNLU MANTIK KONTROLÜ** (ön teşhislerden önce uygula):
-1. Oyuncu kendisinden ≥250 Elo yüksek rakibi yenmişse → "Tavan performans eksikliği" teşhisi koyamazsın; koyacaksan bu galibiyetin neden istisna olduğunu açıkla.
-2. MTB veya karar seti galibiyet oranı %60+ ise → "Mental eksiklik / baskı altında oynayamama" teşhisi koyamazsın; koyacaksan bu oranların neden yanıltıcı olduğunu açıkla.
-3. Hem çok güçlü rakibi yenmişse hem de belirgin şekilde zayıf rakibe kaybetmişse → "İstikrar eksikliği" seçeneğini öncelikli değerlendirmek zorundasın.
-Bu üç kuraldan biriyle çelişen sonuç üretirsen teşhisi yeniden değerlendir.
+**Sınırlayıcı & Avantaj**
+- En kritik sınırlayıcı: tek cümle + sayı.
+- En büyük avantaj: tek cümle + sayı.
 
-**ÇELİŞKİ TESTİ:**
-Aşağıdaki durumlarda çelişen veriyi önce açıklamadan o teşhise ulaşma:
-- MTB galibiyet oranı %60+ veya karar seti galibiyet oranı %60+ ise → "mental eksiklik / baskı altında dağılma" teşhisi koyma veya çelişkiyi açıkla.
-- Oyuncu kendisinden belirgin şekilde yüksek reytingli rakipler yenebiliyorsa → "tavan performans eksikliği" teşhisi koyma veya çelişkiyi açıkla.
-Veri çelişiyorsa o yorumu yapma.
+**6 Ay – Aksiyon**
+3 madde, her biri somut ve ölçülebilir (örn. "kendi Elo'sunun +100 üstü rakiplerle en az 8 maç", "1700+ rakibe karşı set kaybı oranını ölç"). Tahmin/övgü değil, eylem.
 
-**OYUN STİLİ KISITI:** Winner, unforced error, servis yüzdesi veya taktik veri yoksa "agresif / kontraatakçı / defansif / file oyuncusu / hücumcu" gibi stil tanımları yapma. Sadece mücadele profili, maç yönetimi profili, baskı altındaki davranış profili ve geri dönüş kapasitesi hakkında yorum yap.
+**Aileye**
+2 cümle, teknik olmayan sade dil: bugün nerede + 6 ayda neye odaklanılmalı.
 
-**ÖNCELİKLİ SORULAR** — Raporun merkezinde şu sorular olsun:
-- Oyuncunun gelişimini en çok sınırlayan faktör nedir?
-- Oyuncunun en büyük rekabet avantajı nedir?
-- Oyuncunun problemi tavan performans mı, taban performans mı?
-- Önümüzdeki 6 ayda en yüksek getirili gelişim alanı nedir?
-
----
-## ZORUNLU ÖN TEŞHİSLER
-
-Raporu yazmadan önce aşağıdaki üç teşhisi yap. Her biri için Kanıt → Sonuç formatını kullan. Bu teşhisler raporun merkezinde olsun — sonraki tüm bölümler bu teşhisleri destekler veya sorgulamalı.
-
-**Teşhis 1 — Oyuncunun temel problemi:**
-Sadece birini seç: Tavan performans eksikliği / İstikrar eksikliği / Baskı altında performans eksikliği / Veri yetersiz
-Kanıt: [destekleyen veriler]
-Sonuç: [neden bu seçim]
-
-**Teşhis 2 — Oyuncunun en büyük rekabet avantajı:**
-Sadece birini seç: Güçlü rakipleri yenebilme kapasitesi / İstikrar / Baskı altında performans / Zayıf rakiplere karşı hata yapmama / Veri yetersiz
-Kanıt: [destekleyen veriler]
-Sonuç: [neden bu seçim]
-
-**Teşhis 3 — Önümüzdeki 6 ayda en yüksek getirili gelişim alanı:**
-Sadece birini seç: Daha güçlü rakiplerle oynamak / İstikrarı artırmak / Mental performans / Teknik gelişim / Veri yetersiz
-Kanıt: [destekleyen veriler]
-Sonuç: [neden bu seçim]
-
----
-## GELİŞİM RAPORU TALEBİ
-
-Aşağıdaki her başlık için ayrı bölüm yaz. Her bölümde önce **Veriden Çıkan Bulgular**, ardından **Analistin Yorumu**:
-
-**0. Yönetici Özeti**
-8-10 satırda özetle: bugünkü seviye, son 12 aydaki gelişim, en güçlü özellik, en kritik gelişim alanı, 12 aylık genel görünüm. Raporun tamamını okumaya vakti olmayan biri için.
-
-**1. Genel Profil & Seviye Tespiti**
-Oyuncuyu şu seviyelerden en uygununa yerleştir: İl düzeyi / Bölgesel güçlü / Ulusal rekabetçi / Ulusal üst düzey / Milli takım adayı.
-Ardından iki soruyu yanıtla:
-- "Neden bir üst kategori değil?" (kanıtla destekle)
-- "Neden bir alt kategori değil?" (kanıtla destekle)
-
-**2. Reyting Trendi & Elo Bağlamı**
-Kariyer yayını yorumla. Kısa vade deltasını değerlendir. Elo kayıplarının ne kadarının beklenen (güçlü rakip) ne kadarının performans düşüşünden kaynaklandığını analiz et.
-
-**3. Skor Kalitesi & Maç Yönetimi Profili**
-Dominant vs yakın galibiyetler, MTB rekoru ve 3. set performansını değerlendir. Oyun stili kısıtına uy; mücadele profili, baskı altındaki davranış ve geri dönüş kapasitesi hakkında yorum yap. Güven seviyesini belirt.
-
-**4. Kritik Maç (Clutch) Performansı**
-Match Tie-Break ve 3. set rekoruna bak. Baskı altında performans hakkında çıkarım yap. Bu yaş grubunda mental dayanıklılık teknik seviyeden bazen daha önemlidir.
-
-**5. Rakip Kalitesi & Maç Değeri**
-Galibiyetlerde ve mağlubiyetlerde ortalama rakip reytingini yorumla. En değerli galibiyeti ve en sürpriz mağlubiyeti Kanıt/Sonuç formatında değerlendir.
-
-**6. Güçlü Yönler & Gelişim Alanları**
-Verilerden çıkarılan somut güçlü ve zayıf taraflar. Her madde için kanıt yaz.
-
-**6A. Tavan ve Taban Performans Analizi**
-- Tavan seviyesi: en güçlü rakibe karşı performans ne söylüyor?
-- Ortalama seviye: tipik maç profili nedir?
-- Taban seviyesi: sürpriz mağlubiyetler ne sıklıkla ve kime karşı?
-**Nihai Teşhis** — Sadece bir seçenek seç, kararsız kalma:
-Seviye eksikliği / İstikrar eksikliği / Mental eksiklik / Veri yetersiz
-Gerekçeyi şu formatta yaz:
-Kanıt: [destekleyen veriler]
-Sonuç: [neden bu faktör en kritik sınırlayıcı unsurdur]
-
-**6B. Mağlubiyet Nedenleri Analizi**
-Mevcut veriye dayanarak mağlubiyetleri şu kategorilere ayır (yaklaşık oran, gerekçe ile):
-- Rakip belirgin şekilde daha iyi: ~%X
-- Kritik anların kaybedilmesi: ~%X
-- İstikrarsız performans: ~%X
-- Veri yetersiz: ~%X
-
-**7. Gelecek Projeksiyonu**
-NOT: Bu oyuncu için uzun vadeli tahminlerde belirsizlik yüksektir; mevcut sonuçlardan profesyonel kariyer veya milli takım geleceği hakkında kesin çıkarım yapma. Sadece kısa ve orta vadeli olasılıkları değerlendir.
-Her senaryo için zorunlu olarak:
-- Dayandığı veriler
-- Varsayımlar
-- Güven seviyesi (düşük/orta/yüksek)
-
-Senaryolar: güçlü / beklenen / zayıf. Elo tahminine ek olarak Türkiye rekabeti içinde konum değişimini yaz.
-
-**8. Turnuva & Antrenman Stratejisi**
-İki ayrı hedef için ayrı yaz:
-a) Elo koruma/artırma: ideal rakip reytingi bandı
-b) Oyuncu gelişimini hızlandırma: turnuva türü ve rakip profili
-Önümüzdeki 6 ay için somut öneri.
-
-**9. Kırmızı Bayraklar**
-Verilerde görülen ve uzun vadeli gelişimi sınırlayabilecek riskler.
-
-**10. Aile İçin Kısa Özet**
-Teknik olmayan, sade dil. 5 maddede:
-- Bu oyuncu bugün nerede?
-- En güçlü tarafı ne?
-- En acil gelişim alanı ne?
-- Önümüzdeki 6 ayda neye odaklanılmalı?
-- Genel potansiyel değerlendirmesi.
-
-**11. 6 Aylık Aksiyon Planı (Antrenör İçin)**
-- Teknik öncelik
-- Taktik öncelik
-- Mental öncelik
-- Turnuva planı
-- Ölçülecek 3 KPI — sonuç odaklı ve ölçülebilir olmalı (örnek format: "MTB galibiyet oranını %70 üzerinde tutmak", "1520 altı rakiplere karşı mağlubiyet oranını %20 altına indirmek")
-
-**12. Eğer Bu Oyuncu Benim Öğrencim Olsaydı**
-Sadece 3 madde, kısa ve net:
-1. Yarın sabah değiştireceğim ilk şey
-2. Önümüzdeki 3 ay boyunca en büyük odak noktam
-3. Kesinlikle bozmayacağım güçlü yön
-
-**13. Tek Cümlelik Hüküm**
-En fazla 50 kelime. "Bu oyuncu şu anda nerede ve önündeki en büyük fırsat nedir?" sorusunu yanıtla. Raporun tamamını tek paragrafta özetle.`;
+Kurallar: Toplam ~350 kelime. Markdown başlıklar bold. Madde madde yaz, paragraf şişirme. Aynı sayıyı birden çok bölümde tekrarlama. Güven düşükse "(güven: düşük)" ekle.`;
 }
 
 // ---------- H2H ----------
