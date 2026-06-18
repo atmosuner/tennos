@@ -18,6 +18,8 @@ work/ikort_players_cache/
 /work/*.html
 /work/*.headers
 
+# Uncompressed browser DB is a build artifact; only ship the gzipped one:
+work/web/tennos-web.db
 # Keep the shipped browser database (needed by the static site):
 !work/web/tennos-web.db.gz
 

@@ -74,6 +74,22 @@ def build_score(conn: sqlite3.Connection, match_id: str, player_is_first: bool) 
     return " ".join(parts)
 
 
+def build_set_cols(conn: sqlite3.Connection, match_id: str, player_is_first: bool) -> list[dict]:
+    """Per-set games/tiebreak from the player's perspective, for column-style score display."""
+    sets = conn.execute(
+        "SELECT set_number, p1_games, p1_tiebreak, p2_games, p2_tiebreak FROM sets WHERE match_id=? ORDER BY set_number",
+        (match_id,),
+    ).fetchall()
+    out = []
+    for s in sets:
+        w, l = (s["p1_games"], s["p2_games"]) if player_is_first else (s["p2_games"], s["p1_games"])
+        tw, tl = (s["p1_tiebreak"], s["p2_tiebreak"]) if player_is_first else (s["p2_tiebreak"], s["p1_tiebreak"])
+        if w is None and l is None:
+            continue
+        out.append({"w": w, "l": l, "tw": tw, "tl": tl})
+    return out
+
+
 def player_matches(conn: sqlite3.Connection, player_id: int, limit: int | None = None) -> list[dict]:
     sql = """
         SELECT m.match_id, m.match_date, m.event, m.stage, m.result_type,
@@ -165,6 +181,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path == "/api/stats":
                 self.send_json(self.api_stats(conn))
+            elif path == "/api/homeInsights":
+                self.send_json(self.api_home_insights(conn))
             elif path == "/api/rankings":
                 self.send_json(self.api_rankings(conn, q))
             elif path.startswith("/api/player/"):
@@ -215,6 +233,46 @@ class Handler(BaseHTTPRequestHandler):
             "byAgeGroup": ages,
         }
 
+    def api_home_insights(self, conn):
+        one = lambda sql, p=(): (lambda r: dict(r) if r else None)(conn.execute(sql, p).fetchone())
+        many = lambda sql, p=(): rows_to_dicts(conn.execute(sql, p).fetchall())
+        scal = lambda sql, p=(): conn.execute(sql, p).fetchone()[0]
+        MONTHS = ["", "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
+        year = scal("SELECT MAX(SUBSTR(match_date,7,4)) FROM matches WHERE match_date<>''") or ""
+        yf = "SUBSTR(match_date,7,4)=?"
+        busiest = one(f"SELECT SUBSTR(match_date,4,2) mo,count(*) n FROM matches WHERE {yf} AND match_date<>'' GROUP BY mo ORDER BY n DESC LIMIT 1", (year,))
+        top_cat = one(f"SELECT age_group,gender,count(*) n FROM matches WHERE {yf} AND age_group IS NOT NULL AND gender<>'' GROUP BY age_group,gender ORDER BY n DESC LIMIT 1", (year,))
+        season = {
+            "year": year,
+            "matches": scal(f"SELECT count(*) FROM matches WHERE {yf}", (year,)),
+            "completed": scal(f"SELECT count(*) FROM matches WHERE {yf} AND result_type='completed'", (year,)),
+            "tournaments": scal("SELECT count(*) FROM tournaments WHERE year=?", (int(year) if year else 0,)),
+            "busiestMonth": MONTHS[int(busiest["mo"])] if busiest else "—",
+            "topCategory": f"{top_cat['age_group']} Yaş {top_cat['gender']}" if top_cat else "—",
+        }
+        records = {
+            "peak": one("SELECT player_id,name,round(peak_rating) v FROM player_ratings ORDER BY peak_rating DESC LIMIT 1"),
+            "mostMatches": one("SELECT player_id,name,matches v FROM player_ratings ORDER BY matches DESC LIMIT 1"),
+            "youngest": one("SELECT player_id,name,birth_year v,round(rating) rating FROM player_ratings WHERE matches>=5 AND birth_year IS NOT NULL ORDER BY birth_year DESC,rating DESC LIMIT 1"),
+            "bestPct": one("SELECT player_id,name,wins,losses,round(wins*100.0/matches) v FROM player_ratings WHERE matches>=30 ORDER BY wins*1.0/matches DESC LIMIT 1"),
+            "mostTitles": one("SELECT winner_id player_id,count(*) v FROM matches WHERE stage='Final' AND winner_id IS NOT NULL GROUP BY winner_id ORDER BY v DESC LIMIT 1"),
+        }
+        if records["mostTitles"]:
+            nm = one("SELECT name FROM player_ratings WHERE player_id=?", (records["mostTitles"]["player_id"],)) or one("SELECT name FROM players WHERE player_id=?", (records["mostTitles"]["player_id"],))
+            records["mostTitles"]["name"] = nm["name"] if nm else None
+        top_clubs = many("SELECT club_id,club_name,sum(wins) w,sum(losses) l,round(sum(wins)*100.0/(sum(wins)+sum(losses))) pct,count(*) n FROM player_ratings WHERE club_id IS NOT NULL AND club_name<>'' AND matches>=5 GROUP BY club_id HAVING n>=20 AND (w+l)>0 ORDER BY pct DESC LIMIT 8")
+        max_birth = scal("SELECT MAX(birth_year) FROM player_ratings WHERE matches>=5")
+        young_talents = many("SELECT player_id,name,birth_year,rating,club_name FROM player_ratings WHERE birth_year>=? AND matches>=5 ORDER BY rating DESC LIMIT 10", (max_birth - 1,))
+        upsets = many(
+            """SELECT m.winner_id,wr.name wn,round(wr.rating) wrating,m.loser_id,lr.name ln,round(lr.rating) lrating,round(lr.rating-wr.rating) gap,m.match_date,m.event
+               FROM matches m JOIN player_ratings wr ON wr.player_id=m.winner_id JOIN player_ratings lr ON lr.player_id=m.loser_id
+               WHERE m.result_type='completed' AND wr.matches>=10 AND lr.matches>=10 AND lr.rating-wr.rating>0
+               ORDER BY gap DESC LIMIT 6"""
+        )
+        cohorts = many("SELECT birth_year,round(avg(rating)) avg,count(*) n FROM player_ratings WHERE birth_year IS NOT NULL AND matches>=5 GROUP BY birth_year HAVING n>=20 ORDER BY birth_year DESC LIMIT 8")
+        cities = many("SELECT city,count(*) n FROM players WHERE city<>'' AND city IS NOT NULL GROUP BY city ORDER BY n DESC LIMIT 10")
+        return {"season": season, "records": records, "topClubs": top_clubs, "youngTalents": young_talents, "upsets": upsets, "cohorts": cohorts, "cities": cities}
+
     def api_rankings(self, conn, q):
         where, params = ["1=1"], []
         if q.get("age_group"):
@@ -231,8 +289,8 @@ class Handler(BaseHTTPRequestHandler):
             from datetime import date, timedelta
             cutoff = (date.today() - timedelta(days=365)).strftime("%Y%m%d")
             where.append(f"SUBSTR(pr.last_match_date,7,4)||SUBSTR(pr.last_match_date,4,2)||SUBSTR(pr.last_match_date,1,2)>='{cutoff}'")
-        min_matches = int(q.get("min_matches", 5))
-        where.append("pr.matches>=?"); params.append(min_matches)
+        if q.get("min_matches") is not None:
+            where.append("pr.matches>=?"); params.append(int(q["min_matches"]))
         limit = min(int(q.get("limit", 50)), 500)
         offset = int(q.get("offset", 0))
         if q.get("age_group"):
@@ -442,7 +500,7 @@ class Handler(BaseHTTPRequestHandler):
         mc_sql = "(SELECT count(*) FROM matches m WHERE m.tournament_id=t.tournament_id AND m.winner_id IS NOT NULL AND m.loser_id IS NOT NULL)"
         sql = f"""
             SELECT t.tournament_id, t.name, t.city, t.start_date, t.year, t.type_text, t.surface, t.court_type,
-                   c.name AS club_name, {mc_sql} AS match_count
+                   t.source_tab, c.name AS club_name, {mc_sql} AS match_count
             FROM tournaments t LEFT JOIN clubs c ON c.club_id=t.club_id
             WHERE {' AND '.join(where)} AND ({mc_sql}>0 OR t.source_tab='guncel')
             ORDER BY SUBSTR(REPLACE(t.start_date,' ',''),7,4)||SUBSTR(REPLACE(t.start_date,' ',''),4,2)||SUBSTR(REPLACE(t.start_date,' ',''),1,2) DESC,
@@ -473,7 +531,7 @@ class Handler(BaseHTTPRequestHandler):
             champs.setdefault(r["event"], r["winner_id"])
         # matches
         mrows = conn.execute(
-            """SELECT match_id, event, stage, day_name, match_date, court, result_type,
+            """SELECT match_id, event, stage, gender, day_name, match_date, court, start_time, match_code, result_type,
                       winner_id, loser_id, p1_id FROM matches WHERE tournament_id=?""",
             (tid,),
         ).fetchall()
@@ -492,11 +550,12 @@ class Handler(BaseHTTPRequestHandler):
             if r["winner_id"] is None or r["loser_id"] is None:
                 continue
             matches.append({
-                "event": r["event"], "stage": r["stage"], "dayName": r["day_name"],
-                "date": r["match_date"], "court": r["court"],
+                "event": r["event"], "stage": r["stage"], "gender": r["gender"], "dayName": r["day_name"],
+                "date": r["match_date"], "court": r["court"], "startTime": r["start_time"], "matchCode": r["match_code"],
                 "winnerId": r["winner_id"], "winnerName": names.get(r["winner_id"]),
                 "loserId": r["loser_id"], "loserName": names.get(r["loser_id"]),
                 "score": build_score(conn, r["match_id"], player_is_first=(r["p1_id"] == r["winner_id"])),
+                "sets": build_set_cols(conn, r["match_id"], player_is_first=(r["p1_id"] == r["winner_id"])),
             })
         for c in cats:
             cid = champs.get(c["event"])
@@ -513,7 +572,10 @@ class Handler(BaseHTTPRequestHandler):
         sql = f"""
             SELECT c.club_id, c.name, c.city,
                    (SELECT count(*) FROM players p WHERE p.club_id=c.club_id) AS player_count,
-                   (SELECT count(*) FROM player_ratings pr WHERE pr.club_id=c.club_id) AS rated_count
+                   (SELECT count(*) FROM player_ratings pr WHERE pr.club_id=c.club_id) AS rated_count,
+                   (SELECT coalesce(sum(pr2.wins),0) FROM player_ratings pr2 WHERE pr2.club_id=c.club_id) AS total_wins,
+                   (SELECT coalesce(sum(pr2.losses),0) FROM player_ratings pr2 WHERE pr2.club_id=c.club_id) AS total_losses,
+                   (SELECT round(avg(pr3.rating)) FROM player_ratings pr3 WHERE pr3.club_id=c.club_id) AS avg_rating
             FROM clubs c WHERE {' AND '.join(where)}
             ORDER BY player_count DESC LIMIT ?
         """
