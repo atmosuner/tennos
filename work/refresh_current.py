@@ -15,6 +15,7 @@ import gzip
 import json
 import re
 import shutil
+import ssl
 import subprocess
 import sys
 import urllib.request
@@ -163,7 +164,7 @@ def parse_tournaments_html(html: str) -> list[dict[str, Any]]:
     return results
 
 
-def fetch_html(url: str, timeout: float = 30.0) -> str:
+def fetch_html(url: str, timeout: float = 30.0, ssl_context: ssl.SSLContext | None = None) -> str:
     req = urllib.request.Request(
         url,
         headers={
@@ -171,19 +172,20 @@ def fetch_html(url: str, timeout: float = 30.0) -> str:
             "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.7,en;q=0.6",
         },
     )
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
+    with urllib.request.urlopen(req, timeout=timeout, context=ssl_context) as resp:
         charset = resp.headers.get_content_charset() or "utf-8"
         return resp.read().decode(charset, errors="ignore")
 
 
 def is_yas_tournament(t: dict[str, Any]) -> bool:
-    """Keep 8-14 yaş individual tournaments; drop 7 yaş and doubles."""
-    k = (t.get("kategori") or "").lower()
-    if re.search(r"(?<!\d)7\s*yaş", k):
+    """Keep 8-14 yaş individual tournaments; drop 7 yaş, 15+ yaş, and doubles."""
+    text = f"{t.get('turnuvaAdi', '')} {t.get('kategori', '')}".lower()
+    if re.search(r"(çift|cift|double|takım|takim)", text):
         return False
-    if re.search(r"(çift|cift|double|takım|takim)", k):
+    m = re.search(r"(\d+)[- \d]*\s*ya[sş]", text)
+    if not m:
         return False
-    return bool(re.search(r"\d+\s*yaş", k))
+    return 8 <= int(m.group(1)) <= 14
 
 
 def load_existing(path: Path) -> dict[str, dict[str, Any]]:
@@ -216,18 +218,28 @@ def run(cmd: list[str], dry_run: bool) -> bool:
 
 
 def main() -> int:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(description="Fetch güncel tournaments and refresh web DB.")
     parser.add_argument("--dry-run", action="store_true", help="Print planned actions, make no changes.")
     parser.add_argument("--no-rebuild", action="store_true", help="Skip build_db / build_ratings / build_web_db steps.")
     parser.add_argument("--no-gzip", action="store_true", help="Skip gzip step (use when gzip not on PATH).")
     parser.add_argument("--timeout", type=float, default=30.0, help="HTTP timeout for list page fetch.")
+    parser.add_argument("--no-ssl-verify", action="store_true", help="Disable SSL certificate verification (for corporate proxies).")
     args = parser.parse_args()
+
+    ssl_ctx: ssl.SSLContext | None = None
+    if args.no_ssl_verify:
+        ssl_ctx = ssl.create_default_context()
+        ssl_ctx.check_hostname = False
+        ssl_ctx.verify_mode = ssl.CERT_NONE
+        print("WARNING: SSL verification disabled", file=sys.stderr)
 
     # 1. Fetch tournament list
     url = f"{BASE_URL}/turnuvalar"
     print(f"fetch {url} …", end=" ", flush=True)
     try:
-        html = fetch_html(url, timeout=args.timeout)
+        html = fetch_html(url, timeout=args.timeout, ssl_context=ssl_ctx)
     except Exception as exc:
         print(f"HATA: {exc}", file=sys.stderr)
         return 1
@@ -252,7 +264,7 @@ def main() -> int:
     merged = list(existing.values())
     if not args.dry_run:
         atomic_write_json(TOURNAMENTS_JSON, {"tournaments": merged})
-    print(f"tournaments.json: {before} → {len(merged)} (+{len(merged)-before} yeni)")
+    print(f"tournaments.json: {before} -> {len(merged)} (+{len(merged)-before} yeni)")
 
     # 4. Update filtered_yas_tournaments.json
     yas_existing = load_existing(FILTERED_JSON)
@@ -305,7 +317,7 @@ def main() -> int:
         if not args.dry_run:
             _gzip_file(WEB_DB, WEB_DB_GZ)
         else:
-            print(f"  gzip {WEB_DB} → {WEB_DB_GZ}")
+            print(f"  gzip {WEB_DB} -> {WEB_DB_GZ}")
     else:
         print("\n[gzip atlandı — --no-gzip]")
 
