@@ -850,6 +850,11 @@ def select_work(tournaments: list[dict[str, Any]], args: argparse.Namespace) -> 
             elif str(item.get("turnuvaId")) == str(args.start_after):
                 passed = True
         selected = trimmed
+    if args.shard_count and args.shard_count > 1:
+        selected = [
+            item for item in selected
+            if int(str(item.get("turnuvaId"))) % args.shard_count == args.shard_index
+        ]
     if args.limit is not None:
         selected = selected[: args.limit]
     return selected
@@ -869,6 +874,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--limit", type=int, default=None, help="Scrape at most N tournaments.")
     parser.add_argument("--only-id", default="", help="Comma-separated tournament ids to scrape.")
     parser.add_argument("--start-after", default="", help="Resume input ordering after this tournament id.")
+    parser.add_argument("--shard-count", type=int, default=0, help="Split work into N shards by turnuvaId mod N (for parallel runs).")
+    parser.add_argument("--shard-index", type=int, default=0, help="Which shard (0..shard-count-1) this process handles.")
     parser.add_argument("--delay", type=float, default=2.0, help="Minimum delay between network requests.")
     parser.add_argument("--jitter", type=float, default=1.0, help="Random extra delay between network requests.")
     parser.add_argument("--timeout", type=float, default=30.0, help="HTTP timeout seconds.")
