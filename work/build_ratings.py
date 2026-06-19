@@ -199,7 +199,7 @@ def main() -> int:
     print(f"\nTop {args.top} (genel):")
     for rec in records[: args.top]:
         print(
-            f"  {rec['overall_rank']:3} {rec['rating']:6.0f}  {rec['name'][:26]:26} "
+            f"  {rec['overall_rank']:3} {rec['rating']:6.0f}  {(rec['name'] or '?')[:26]:26} "
             f"{(str(rec['birth_year']) if rec['birth_year'] else '?'):4} "
             f"{rec['wins']:3}-{rec['losses']:<3} {(rec['club_name'] or '')[:22]}"
         )

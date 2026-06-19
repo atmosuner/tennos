@@ -227,6 +227,43 @@ def insert_players(cur: sqlite3.Cursor) -> int:
     return len(players)
 
 
+def backfill_missing_players(cur: sqlite3.Cursor) -> int:
+    """Players who only appear in old tournaments (pre-dating the current player
+    directory) are missing from players.json. Recover their name/club from the
+    match data itself so player_ratings.name isn't NULL."""
+    cur.execute(
+        """
+        SELECT mp.player_id, mp.name, mp.club_id, COUNT(*) c
+        FROM match_players mp
+        WHERE mp.player_id IS NOT NULL
+          AND mp.player_id NOT IN (SELECT player_id FROM players)
+        GROUP BY mp.player_id, mp.name, mp.club_id
+        """
+    )
+    best: dict[int, tuple[str | None, int | None, int]] = {}
+    for pid, name, club_id, count in cur.fetchall():
+        if pid not in best or count > best[pid][2]:
+            best[pid] = (name, club_id, count)
+    rows = [
+        {
+            "player_id": pid,
+            "name": ABBREV_RE.sub("", name or "").strip() or None,
+            "club_id": club_id,
+        }
+        for pid, (name, club_id, _count) in best.items()
+    ]
+    if rows:
+        cur.executemany(
+            "INSERT OR IGNORE INTO players (player_id, name, club_id) VALUES (:player_id, :name, :club_id)",
+            rows,
+        )
+        cur.execute(
+            "UPDATE players SET club_name=(SELECT name FROM clubs WHERE clubs.club_id=players.club_id) "
+            "WHERE club_name IS NULL AND club_id IS NOT NULL"
+        )
+    return len(rows)
+
+
 def resolve_club(player_id: Any, abbrev: str | None, overrides: dict[str, Any], unique_map: dict[str, int]) -> int | None:
     if player_id is not None and str(player_id) in overrides:
         return overrides[str(player_id)].get("clubId")
@@ -345,12 +382,14 @@ def main() -> int:
                     )
                     n_sets += 1
 
+    n_backfilled_players = backfill_missing_players(cur)
+
     cur.executescript(INDEXES)
     conn.commit()
     conn.close()
 
     print(f"db={args.db}")
-    print(f"clubs={n_clubs} players={n_players} tournaments={n_tournaments} groups={n_groups}")
+    print(f"clubs={n_clubs} players={n_players} (+{n_backfilled_players} backfilled from match data) tournaments={n_tournaments} groups={n_groups}")
     print(f"matches={n_matches} match_players={n_match_players} sets={n_sets}")
     return 0
 
