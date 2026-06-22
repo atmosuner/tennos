@@ -201,6 +201,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(self.api_tournament(conn, int(path.rsplit("/", 1)[1])))
             elif path == "/api/clubs":
                 self.send_json(self.api_clubs(conn, q))
+            elif path.startswith("/api/club/"):
+                self.send_json(self.api_club(conn, int(path.rsplit("/", 1)[1])))
             elif path == "/api/search":
                 self.send_json(self.api_search(conn, q))
             elif path == "/api/club_opponents":
@@ -587,15 +589,48 @@ class Handler(BaseHTTPRequestHandler):
         limit = min(int(q.get("limit", 100)), 600)
         sql = f"""
             SELECT c.club_id, c.name, c.city,
-                   (SELECT count(*) FROM players p WHERE p.club_id=c.club_id) AS player_count,
-                   (SELECT count(*) FROM player_ratings pr WHERE pr.club_id=c.club_id) AS rated_count,
-                   (SELECT coalesce(sum(pr2.wins),0) FROM player_ratings pr2 WHERE pr2.club_id=c.club_id) AS total_wins,
-                   (SELECT coalesce(sum(pr2.losses),0) FROM player_ratings pr2 WHERE pr2.club_id=c.club_id) AS total_losses,
-                   (SELECT round(avg(pr3.rating)) FROM player_ratings pr3 WHERE pr3.club_id=c.club_id) AS avg_rating
-            FROM clubs c WHERE {' AND '.join(where)}
+                   coalesce(pc.n, 0) AS player_count,
+                   coalesce(pr.rated_count, 0) AS rated_count,
+                   coalesce(pr.total_wins, 0) AS total_wins,
+                   coalesce(pr.total_losses, 0) AS total_losses,
+                   pr.avg_rating
+            FROM clubs c
+            LEFT JOIN (SELECT club_id, count(*) n FROM players GROUP BY club_id) pc ON pc.club_id=c.club_id
+            LEFT JOIN (SELECT club_id, count(*) rated_count, sum(wins) total_wins, sum(losses) total_losses, round(avg(rating)) avg_rating FROM player_ratings GROUP BY club_id) pr ON pr.club_id=c.club_id
+            WHERE {' AND '.join(where)}
             ORDER BY player_count DESC LIMIT ?
         """
         return {"clubs": rows_to_dicts(conn.execute(sql, (*params, limit)).fetchall())}
+
+    def api_club(self, conn, club_id):
+        c = conn.execute("""
+            SELECT c.club_id, c.name, c.city,
+                   coalesce(pc.n, 0) AS player_count,
+                   coalesce(pr.rated_count, 0) AS rated_count,
+                   coalesce(pr.total_wins, 0) AS total_wins,
+                   coalesce(pr.total_losses, 0) AS total_losses,
+                   pr.avg_rating
+            FROM clubs c
+            LEFT JOIN (SELECT club_id, count(*) n FROM players GROUP BY club_id) pc ON pc.club_id=c.club_id
+            LEFT JOIN (SELECT club_id, count(*) rated_count, sum(wins) total_wins, sum(losses) total_losses, round(avg(rating)) avg_rating FROM player_ratings GROUP BY club_id) pr ON pr.club_id=c.club_id
+            WHERE c.club_id=?""", (club_id,)).fetchone()
+        if not c:
+            return {"error": "not found"}
+        from datetime import date, timedelta
+        cutoff = (date.today() - timedelta(days=365)).strftime("%Y%m%d")
+        players = rows_to_dicts(conn.execute("""
+            SELECT p.player_id, p.name, p.birth_year, p.gender,
+                   pr.rating, pr.age_group, pr.overall_rank, pr.age_group_rank, pr.gender_rank,
+                   pr.wins, pr.losses, pr.matches
+            FROM players p JOIN player_ratings pr ON pr.player_id=p.player_id
+            WHERE p.club_id=?
+            AND pr.last_match_date IS NOT NULL
+            AND SUBSTR(pr.last_match_date,7,4)||SUBSTR(pr.last_match_date,4,2)||SUBSTR(pr.last_match_date,1,2)>=?
+            ORDER BY pr.rating DESC""", (club_id, cutoff)).fetchall())
+        tournaments = rows_to_dicts(conn.execute("""
+            SELECT tournament_id, name, city, start_date, year, type_text
+            FROM tournaments WHERE club_id=? ORDER BY year DESC, tournament_id DESC LIMIT 20""", (club_id,)).fetchall())
+        return {"club": dict(c), "players": players, "tournaments": tournaments}
 
     def api_club_opponents(self, conn, q):
         pid = int(q.get("player", 0) or 0)
