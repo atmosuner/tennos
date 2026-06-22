@@ -21,7 +21,7 @@ export default {
     const origin = req.headers.get("Origin") || "";
     const cors = {
       "Access-Control-Allow-Origin": ALLOWED.has(origin) ? origin : "null",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type",
       "Vary": "Origin",
     };
@@ -29,8 +29,37 @@ export default {
       new Response(JSON.stringify(obj), { status, headers: { ...cors, "Content-Type": "application/json" } });
 
     if (req.method === "OPTIONS") return new Response(null, { headers: cors });
-    if (req.method !== "POST") return json({ error: { message: "method not allowed" } }, 405);
     if (!ALLOWED.has(origin)) return json({ error: { message: "origin not allowed" } }, 403);
+
+    // GET /ikort/{id} — proxy ikort profile, extract klasman
+    if (req.method === "GET") {
+      const m = new URL(req.url).pathname.match(/^\/ikort\/(\d+)$/);
+      if (!m) return json({ error: { message: "not found" } }, 404);
+      const pid = m[1];
+      try {
+        const resp = await fetch(`https://ikort.com.tr/oyuncu-profil/${pid}?page=genelbilgi`, {
+          headers: { "User-Agent": "Mozilla/5.0", "Accept-Language": "tr" },
+        });
+        if (!resp.ok) return json({ error: { message: "ikort " + resp.status } }, 502);
+        const html = await resp.text();
+        const extract = (label) => {
+          // Skip HTML tags (attrs may contain numbers) to reach visible text value
+          const rx = new RegExp(label + "(?:[^<\\d]|<[^>]*>)*?(\\d+)", "i");
+          const hit = html.match(rx);
+          return hit ? parseInt(hit[1], 10) : null;
+        };
+        return json({
+          playerId: +pid,
+          ikortUrl: `https://ikort.com.tr/oyuncu-profil/${pid}`,
+          klasmanPuan: extract("Genel Klasman Puan"),
+          klasmanSira: extract("Genel Klasman S[ıi]ra"),
+        }, 200);
+      } catch (e) {
+        return json({ error: { message: e.message } }, 502);
+      }
+    }
+
+    if (req.method !== "POST") return json({ error: { message: "method not allowed" } }, 405);
 
     let body;
     try { body = await req.json(); } catch { return json({ error: { message: "bad json" } }, 400); }

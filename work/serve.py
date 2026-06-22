@@ -209,6 +209,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(self.api_club_opponents(conn, q))
             elif path == "/api/club_vs_club":
                 self.send_json(self.api_club_vs_club(conn, q))
+            elif path.startswith("/api/ikort/"):
+                self.send_json(self.api_ikort(int(path.rsplit("/", 1)[1])))
             else:
                 self.send_json({"error": "not found"}, status=404)
         finally:
@@ -631,6 +633,26 @@ class Handler(BaseHTTPRequestHandler):
             SELECT tournament_id, name, city, start_date, year, type_text
             FROM tournaments WHERE club_id=? ORDER BY year DESC, tournament_id DESC LIMIT 20""", (club_id,)).fetchall())
         return {"club": dict(c), "players": players, "tournaments": tournaments}
+
+    def api_ikort(self, pid):
+        import urllib.request, re as _re
+        url = f"https://ikort.com.tr/oyuncu-profil/{pid}?page=genelbilgi"
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0", "Accept-Language": "tr"})
+            with urllib.request.urlopen(req, timeout=8) as r:
+                html = r.read().decode("utf-8", errors="replace")
+        except Exception as e:
+            return {"error": str(e)}
+        def extract(label):
+            # Skip HTML tags (attrs may contain numbers) to reach the visible text value
+            m = _re.search(label + r'(?:[^<\d]|<[^>]*>)*?(\d+)', html, _re.I)
+            return int(m.group(1)) if m else None
+        return {
+            "playerId": pid,
+            "ikortUrl": url,
+            "klasmanPuan": extract(r"Genel Klasman Puan"),
+            "klasmanSira": extract(r"Genel Klasman S[ıi]ra"),
+        }
 
     def api_club_opponents(self, conn, q):
         pid = int(q.get("player", 0) or 0)

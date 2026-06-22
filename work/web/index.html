@@ -205,9 +205,8 @@
   .profile-info{flex:1;min-width:260px;background:var(--panel);border:1px solid var(--line);
     border-radius:var(--radius);padding:22px 24px;display:flex;flex-direction:column;justify-content:center}
   .profile-score{flex:none;width:230px;background:var(--score-bg);border-radius:var(--radius);
-    padding:20px 24px;display:flex;flex-direction:column;justify-content:center;position:relative;overflow:hidden}
-  .profile-score::before{content:"";position:absolute;left:24px;right:24px;top:50%;height:1px;background:var(--score-line)}
-  .profile-score::after{content:"";position:absolute;left:50%;top:18px;bottom:18px;width:1px;background:var(--score-line)}
+    display:flex;flex-direction:column;position:relative;overflow:hidden}
+  .ps-sect{padding:20px 24px}
   .bigrating{font-family:var(--font-mono);font-size:50px;font-weight:700;color:var(--score-ink);line-height:.9;
     letter-spacing:-.03em;font-variant-numeric:tabular-nums;position:relative}
   .row{display:flex;gap:28px;flex-wrap:wrap}
@@ -287,7 +286,7 @@
     .rec-grid{grid-template-columns:repeat(2,1fr)!important}
     main{padding:22px 16px 96px}
     h1{font-size:25px} h2{font-size:16px;margin:26px 0 12px}
-    .profile-info,.profile-score{padding:18px}
+    .profile-info{padding:18px} .ps-sect{padding:14px 18px}
     .bigrating{font-size:38px}
     table{display:block;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch}
     th,td{padding:10px 12px}
@@ -1153,9 +1152,15 @@ async function player(id){
           ${b&&b.city?`<span class="pill">${esc(b.city)}</span>`:''}</div>
       </div>
       <div class="profile-score">
-        <div style="font-family:var(--font-mono);font-size:10px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:#7c8089;position:relative">ELO REYTİNG</div>
-        <div class="bigrating">${r?Math.round(r.rating):'—'}</div>
-        <div style="font-family:var(--font-mono);font-size:12px;color:#9aa0aa;margin-top:6px;position:relative">zirve ${r?Math.round(r.peak_rating):'—'} · taban ${tabanRating??'—'}</div>
+        <div class="ps-sect">
+          <div style="font-family:var(--font-mono);font-size:10px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:#7c8089">ELO REYTİNG</div>
+          <div class="bigrating">${r?Math.round(r.rating):'—'}</div>
+          <div style="font-family:var(--font-mono);font-size:12px;color:#9aa0aa;margin-top:6px">zirve ${r?Math.round(r.peak_rating):'—'} · taban ${tabanRating??'—'}</div>
+        </div>
+        <div id="ikort-score" class="ps-sect" style="border-top:1px solid var(--score-line)">
+          <div style="font-family:var(--font-mono);font-size:10px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:#7c8089">İKORT KLASMAN</div>
+          <div style="font-family:var(--font-mono);font-size:12px;color:#9aa0aa;margin-top:4px">yükleniyor…</div>
+        </div>
       </div>
     </div>
     <div class="cards">
@@ -1211,6 +1216,25 @@ async function player(id){
   if($('#mAg')) $('#mAg').onchange=upd;
   renderMatches('','','','');
   drawRatingChart();
+
+  // ikort klasman fetch
+  (async()=>{
+    const el=document.getElementById('ikort-score'); if(!el) return;
+    const local=location.hostname==='localhost'||location.hostname==='127.0.0.1';
+    const url=local?`/api/ikort/${id}`:`${AI_PROXY_URL}/ikort/${id}`;
+    const ikortUrl=`https://ikort.com.tr/oyuncu-profil/${id}`;
+    const lbl=`<div style="font-family:var(--font-mono);font-size:10px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:#7c8089">İKORT KLASMAN</div>`;
+    const link=`<a href="${ikortUrl}" target="_blank" rel="noopener" style="color:var(--accent-ink);font-family:var(--font-mono);font-size:12px">İkort ↗</a>`;
+    try{
+      const d=await fetch(url).then(r=>r.json());
+      if(d.error||d.klasmanPuan==null){el.innerHTML=lbl+`<div style="margin-top:6px">${link}</div>`;return;}
+      el.innerHTML=lbl+
+        `<div class="bigrating" style="margin-top:4px">${d.klasmanPuan}</div>`+
+        `<div style="font-family:var(--font-mono);font-size:12px;color:#9aa0aa;margin-top:6px">${d.klasmanSira!=null?'#'+d.klasmanSira+' sıra · ':''}${link}</div>`;
+    }catch(e){
+      el.innerHTML=lbl+`<div style="margin-top:6px">${link}</div>`;
+    }
+  })();
 
   // --- AI section (inserted before matches row) ---
   const aiPrompt=buildAiPrompt(id,d,byYear,recentForForm);
