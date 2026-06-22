@@ -248,7 +248,14 @@
   .cmp .bar{grid-column:2;height:10px;border-radius:5px;background:var(--panel2);display:flex;overflow:hidden}
   .cmp .bar i{display:block;height:100%} .bar .ia{background:linear-gradient(90deg,var(--accent-ink),var(--accent))} .bar .ib{background:linear-gradient(90deg,var(--accent2),#5b9ff5)}
   .win-hi{color:var(--accent-ink)} .win-lo{color:var(--dim)}
+  @keyframes tb-bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-22px)}}
+  @keyframes tb-shadow{0%,100%{transform:scaleX(1);opacity:.25}50%{transform:scaleX(.4);opacity:.07}}
   .loading{color:var(--dim);padding:56px;text-align:center;font-size:15px}
+  .loading::before{content:'';display:block;width:42px;height:42px;
+    background:url("data:image/svg+xml,<svg viewBox='1271.769 1574.648 69.447 69.447' xmlns='http://www.w3.org/2000/svg'><path d='M1341.208,1609.372a34.719,34.719,0,1,1-34.72-34.724A34.724,34.724,0,0,1,1341.208,1609.372Z' fill='%23b9d613'/><path d='M1311.144,1574.993a35.139,35.139,0,0,0-4.61-.344,41.069,41.069,0,0,1-34.369,29.735,34.3,34.3,0,0,0-.381,4.635l.183-.026a45.921,45.921,0,0,0,39.149-33.881Zm29.721,34.692a45.487,45.487,0,0,0-33.488,34.054l-.071.313a34.54,34.54,0,0,0,4.818-.455,41.218,41.218,0,0,1,28.686-29.194,36.059,36.059,0,0,0,.388-4.8Z' fill='%23f7f7f7'/></svg>") center/contain no-repeat;
+    margin:0 auto 6px;animation:tb-bounce .85s ease-in-out infinite}
+  .loading::after{content:'';display:block;width:26px;height:5px;background:var(--dim);
+    border-radius:50%;margin:0 auto 18px;animation:tb-shadow .85s ease-in-out infinite}
   details>summary{list-style:none}details>summary::-webkit-details-marker{display:none}
   details[open]>summary .toggle-arrow{transform:rotate(180deg)}
   .toggle-arrow{display:inline-block;transition:transform .2s;color:var(--dim);font-size:13px}
@@ -365,7 +372,7 @@ syncPalBtns();
   let DB=null;
   window.bootDB=async function(){
     if(DB) return;
-    document.getElementById('app').innerHTML='<div class="loading">veri yükleniyor… (~10 MB, ilk açılışta)</div>';
+    document.getElementById('app').innerHTML='<div class="loading">yükleniyor…</div>';
     const SQL=await initSqlJs({locateFile:f=>`https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/${f}`});
     const resp=await fetch('tennos-web.db.gz');
     if(!resp.ok) throw new Error('db indirilemedi');
@@ -975,7 +982,7 @@ async function rankings(params){
       </div>
       <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:14px;color:var(--txt2);white-space:nowrap"><input type="checkbox" id="fAllTime" ${allTime?'checked':''}> Tüm zamanlar</label>
     </div>
-    <div id="rk" class="loading">…</div>`;
+    <div id="rk" class="loading">yükleniyor…</div>`;
   let _cid=cid, _cnm=cnm;
   const nav=(newCid,newCnm)=>{
     if(newCid!==undefined){_cid=newCid;_cnm=newCnm||'';}
@@ -1734,7 +1741,7 @@ async function clubs(){
   app().innerHTML=`<div style="font-family:var(--font-mono);font-size:11.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--accent-ink);margin-bottom:4px">KULÜP DİZİNİ</div>
     <h1 style="margin:0 0 16px">Kulüpler</h1>
     <input id="cq" placeholder="kulüp ara…" style="width:100%;background:var(--panel);border:1px solid var(--line);color:var(--txt);padding:11px 14px;border-radius:10px;font-size:15px;outline:none;margin-bottom:16px;box-sizing:border-box">
-    <div id="cl" class="loading">…</div>`;
+    <div id="cl" class="loading">yükleniyor…</div>`;
   const load=async term=>{const d=await api('/clubs'+qs({q:term||'',limit:200}));
     $('#cl').outerHTML=`<div id="cl"><div class="club-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:13px">
       ${d.clubs.map(c=>{const tot=c.total_wins+c.total_losses,pct=tot?Math.round(c.total_wins/tot*100):null;
@@ -1848,7 +1855,7 @@ async function clubDetail(id){
 
 // club_id filtered rankings reuse
 async function rankingsClub(cid){
-  app().innerHTML=`<h1>Kulüp Sıralaması</h1><div id="rk" class="loading">…</div>`;
+  app().innerHTML=`<h1>Kulüp Sıralaması</h1><div id="rk" class="loading">yükleniyor…</div>`;
   const r=await api('/rankings'+qs({club_id:cid,limit:200}));
   $('#rk').outerHTML=`<div id="rk">${rankTable(r.rankings,'overall_rank')}</div>`;
 }
@@ -1867,7 +1874,7 @@ async function players_dir(params){
       <select id="pAg"><option value="">Tüm Kategori</option></select>
       <div id="pClub" style="position:relative"></div>
     </div>
-    <div id="pl" class="loading">…</div>`;
+    <div id="pl" class="loading">yükleniyor…</div>`;
   const d=await api('/players'+qs({q:term,gender:gn,birth_year:by,age_group:ag,club_id:cid,limit,offset}));
   $('#pYear').innerHTML='<option value="">Tüm Doğum Yılı</option>'+d.years.map(y=>`<option value="${y}" ${y==by?'selected':''}>${y}</option>`).join('');
   $('#pAg').innerHTML='<option value="">Tüm Kategori</option>'+(d.age_groups||[]).map(a=>`<option value="${a}" ${a==ag?'selected':''}>${a} Yaş</option>`).join('');
@@ -1928,7 +1935,7 @@ async function tournaments(params){
       <input id="tQ" value="${esc(term)}" placeholder="turnuva / şehir ara…" style="background:var(--panel);border:1px solid var(--line);color:var(--txt);padding:10px 14px;border-radius:10px;outline:none;font-size:15px;flex:1;min-width:160px">
       <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:14px;color:var(--txt2);white-space:nowrap"><input type="checkbox" id="tOngoing" ${incl?'checked':''}> Güncel turnuvaları da göster</label>
     </div>
-    <div id="tl" class="loading">…</div>`;
+    <div id="tl" class="loading">yükleniyor…</div>`;
   const d=await api('/tournaments'+qs({year:yr,q:term,age_group:ag,include_ongoing:incl,limit:700}));
   $('#tYear').innerHTML='<option value="">Tüm Yıllar</option>'+d.years.map(y=>`<option value="${y}" ${y==yr?'selected':''}>${y}</option>`).join('');
   $('#tAg').innerHTML='<option value="">Tüm Yaş Grupları</option>'+(d.age_groups||[]).map(a=>`<option value="${a}" ${a==ag?'selected':''}>${a} Yaş</option>`).join('');
