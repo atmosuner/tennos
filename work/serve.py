@@ -222,7 +222,7 @@ class Handler(BaseHTTPRequestHandler):
     def api_stats(self, conn):
         from datetime import date, timedelta
         g = lambda sql, p=(): conn.execute(sql, p).fetchone()[0]
-        cutoff = (date.today() - timedelta(days=365)).strftime("%Y%m%d")
+        cutoff = (date.today() - timedelta(days=183)).strftime("%Y%m%d")
         af = "SUBSTR(last_match_date,7,4)||SUBSTR(last_match_date,4,2)||SUBSTR(last_match_date,1,2)>=?"
         ages = rows_to_dicts(conn.execute(
             f"SELECT age_group, count(*) n FROM player_ratings WHERE age_group IS NOT NULL AND {af} GROUP BY age_group ORDER BY age_group",
@@ -245,7 +245,7 @@ class Handler(BaseHTTPRequestHandler):
         scal = lambda sql, p=(): conn.execute(sql, p).fetchone()[0]
         MONTHS = ["", "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
         from datetime import date, timedelta
-        acs = (date.today() - timedelta(days=365)).strftime("%Y%m%d")
+        acs = (date.today() - timedelta(days=183)).strftime("%Y%m%d")
         af = lambda p="": (f"SUBSTR({p}last_match_date,7,4)||SUBSTR({p}last_match_date,4,2)||SUBSTR({p}last_match_date,1,2)>='{acs}'")
         year = scal("SELECT MAX(SUBSTR(match_date,7,4)) FROM matches WHERE match_date<>''") or ""
         yf = "SUBSTR(match_date,7,4)=?"
@@ -309,7 +309,7 @@ class Handler(BaseHTTPRequestHandler):
             where.append(f"{foldsql('pr.name')} LIKE ?"); params.append(f"%{fold(q['q'])}%")
         if not q.get("all_time"):
             from datetime import date, timedelta
-            cutoff = (date.today() - timedelta(days=365)).strftime("%Y%m%d")
+            cutoff = (date.today() - timedelta(days=183)).strftime("%Y%m%d")
             where.append(f"SUBSTR(pr.last_match_date,7,4)||SUBSTR(pr.last_match_date,4,2)||SUBSTR(pr.last_match_date,1,2)>='{cutoff}'")
         if q.get("min_matches") is not None:
             where.append("pr.matches>=?"); params.append(int(q["min_matches"]))
@@ -362,6 +362,10 @@ class Handler(BaseHTTPRequestHandler):
             [{"playerId": k, **v, "total": v["w"] + v["l"]} for k, v in opp.items()],
             key=lambda x: x["total"], reverse=True,
         )[:8]
+        kh = conn.execute(
+            "SELECT year, week, type, puan FROM klasman_puan WHERE player_id=? ORDER BY year, week",
+            (pid,),
+        ).fetchall()
         return {
             "player": dict(base) if base else None,
             "rating": dict(rating) if rating else None,
@@ -369,6 +373,7 @@ class Handler(BaseHTTPRequestHandler):
             "totalMatches": len(matches),
             "stageRecord": stages,
             "topOpponents": top_opponents,
+            "klasmanHistory": [dict(r) for r in kh],
         }
 
     def api_h2h(self, conn, a, b):
@@ -621,7 +626,7 @@ class Handler(BaseHTTPRequestHandler):
         if not c:
             return {"error": "not found"}
         from datetime import date, timedelta
-        cutoff = (date.today() - timedelta(days=365)).strftime("%Y%m%d")
+        cutoff = (date.today() - timedelta(days=183)).strftime("%Y%m%d")
         players = rows_to_dicts(conn.execute("""
             SELECT p.player_id, p.name, p.birth_year, p.gender,
                    pr.rating, pr.age_group, pr.overall_rank, pr.age_group_rank, pr.gender_rank,

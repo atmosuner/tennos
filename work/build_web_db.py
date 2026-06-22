@@ -25,13 +25,10 @@ def main() -> int:
     shutil.copyfile(SRC, DST)
     conn = sqlite3.connect(DST)
     cur = conn.cursor()
-    cur.executescript(
-        """
-        DROP TABLE IF EXISTS match_players;
-        DROP TABLE IF EXISTS groups;
-        ALTER TABLE matches DROP COLUMN raw_text;
-        """
-    )
+    cur.executescript("DROP TABLE IF EXISTS match_players; DROP TABLE IF EXISTS groups;")
+    cols = [r[1] for r in cur.execute("PRAGMA table_info(matches)").fetchall()]
+    if "raw_text" in cols:
+        cur.execute("ALTER TABLE matches DROP COLUMN raw_text")
     conn.commit()
     conn.execute("VACUUM")
     conn.close()
