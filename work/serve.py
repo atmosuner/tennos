@@ -209,6 +209,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(self.api_club_opponents(conn, q))
             elif path == "/api/club_vs_club":
                 self.send_json(self.api_club_vs_club(conn, q))
+            elif path.startswith("/api/ikort/") and path.endswith("/klasman"):
+                self.send_json(self.api_ikort_klasman(int(path.split("/")[-2])))
             elif path.startswith("/api/ikort/"):
                 self.send_json(self.api_ikort(int(path.rsplit("/", 1)[1])))
             else:
@@ -635,11 +637,12 @@ class Handler(BaseHTTPRequestHandler):
         return {"club": dict(c), "players": players, "tournaments": tournaments}
 
     def api_ikort(self, pid):
-        import urllib.request, re as _re
+        import urllib.request, re as _re, ssl
         url = f"https://ikort.com.tr/oyuncu-profil/{pid}?page=genelbilgi"
+        ctx = ssl.create_default_context(); ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0", "Accept-Language": "tr"})
-            with urllib.request.urlopen(req, timeout=8) as r:
+            with urllib.request.urlopen(req, timeout=8, context=ctx) as r:
                 html = r.read().decode("utf-8", errors="replace")
         except Exception as e:
             return {"error": str(e)}
@@ -653,6 +656,55 @@ class Handler(BaseHTTPRequestHandler):
             "klasmanPuan": extract(r"Genel Klasman Puan"),
             "klasmanSira": extract(r"Genel Klasman S[ıi]ra"),
         }
+
+    def api_ikort_klasman(self, pid):
+        import urllib.request, re as _re, ssl
+        url = f"https://ikort.com.tr/oyuncu-profil/{pid}?page=genelklasman"
+        ctx = ssl.create_default_context(); ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0", "Accept-Language": "tr"})
+            with urllib.request.urlopen(req, timeout=10, context=ctx) as r:
+                html = r.read().decode("utf-8", errors="replace")
+        except Exception as e:
+            return {"error": str(e)}
+        def xnum(label):
+            m = _re.search(label + r'(?:[^<\d]|<[^>]*>)*?(\d+)', html, _re.I)
+            return int(m.group(1)) if m else None
+        def clean(s):
+            return ' '.join(_re.sub(r'<[^>]+>', ' ', s).split())
+        summary = {
+            "puan": xnum(r"Genel Klasman Puan"),
+            "sira": xnum(r"Genel Klasman S[ıi]ra"),
+            "ulusal": xnum(r"Ulusal Puan"),
+            "uluslararasi": xnum(r"Uluslararas[ıi] Puan"),
+        }
+        # Collect section headings (h2-h5) and data rows by position, then sort
+        items = []
+        for m in _re.finditer(r'<h[2-5]\b[^>]*>(.*?)</h[2-5]>', html, _re.S | _re.I):
+            t = clean(m.group(1))
+            if t and len(t) < 120:
+                items.append((m.start(), "header", [t]))
+        for m in _re.finditer(r'<tr\b([^>]*)>(.*?)</tr>', html, _re.S | _re.I):
+            tr_attrs, tr_html = m.group(1), m.group(2)
+            ths = [clean(th) for th in _re.findall(r'<th\b[^>]*>(.*?)</th>', tr_html, _re.S | _re.I)]
+            raw_tds = _re.findall(r'<td\b[^>]*>(.*?)</td>', tr_html, _re.S | _re.I)
+            tds = [clean(td) for td in raw_tds]
+            if ths and not tds:
+                pass  # skip column-header rows
+            elif tds and any(_re.search(r'\d{2}[-./]\d{2}[-./]\d{4}', c) for c in tds):
+                # counted: check tr class or first td raw content
+                tr_cls = (_re.search(r'class=["\']([^"\']+)', tr_attrs) or _re.search(r'$', '')).group(1) if _re.search(r'class=', tr_attrs) else ''
+                sayilan_raw = raw_tds[0] if raw_tds else ''
+                counted = bool(_re.search(r'pointsticked', sayilan_raw, _re.I))
+                items.append((m.start(), "data", tds, sayilan_raw[:800], counted))
+        items.sort(key=lambda x: x[0])
+        rows = []
+        for item in items:
+            if item[1] == "header":
+                rows.append({"type": "header", "cells": item[2]})
+            else:
+                rows.append({"type": "data", "cells": item[2], "sayilan": item[3], "counted": item[4]})
+        return {"summary": summary, "rows": rows}
 
     def api_club_opponents(self, conn, q):
         pid = int(q.get("player", 0) or 0)

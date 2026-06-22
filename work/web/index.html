@@ -294,6 +294,7 @@
     .vs{gap:12px;padding:18px} .vs .c{font-size:34px} .vs .n{font-size:17px}
     .cmp{gap:6px 12px} .cmp .va,.cmp .vb{font-size:17px}
     .profile-score{width:100%;text-align:left}
+    .kl-club{display:none!important}
     .matchline{flex-wrap:wrap;gap:6px 10px}
     .matchline>span[style*="margin-left:auto"],.matchline>span[style*="margin-left: auto"]{margin-left:0!important;text-align:left!important;flex-basis:100%}
     .filters input,.filters select{flex:1 1 auto;min-width:0}
@@ -1186,7 +1187,7 @@ async function player(id){
       </div>
     </div>
     <div id="matches-card" class="card" style="padding:0;margin-top:0">
-      <details open>
+      <details>
         <summary style="list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;user-select:none;padding:16px 22px">
           <h2 style="margin:0">Maçlar</h2>
           <span class="toggle-arrow">▾</span>
@@ -1268,6 +1269,91 @@ async function player(id){
     </details>`;
   const rowEl=$('#matches-card');
   app().insertBefore(aiCard, rowEl);
+
+  // İKORT Klasman Dökümü — above AI, lazy-loaded on first open
+  const klasmanCard=document.createElement('div');
+  klasmanCard.className='card';
+  klasmanCard.style.cssText='padding:0;margin-bottom:14px;overflow:hidden';
+  klasmanCard.innerHTML=`
+    <details>
+      <summary style="list-style:none;padding:16px 22px;cursor:pointer;display:flex;align-items:center;gap:10px;user-select:none">
+        <span style="font-size:17px;font-weight:700;font-family:var(--font-disp)">İKORT Klasman Dökümü</span>
+        <span class="toggle-arrow" style="margin-left:auto">▾</span>
+      </summary>
+      <div id="klasman-body" style="padding:0 22px 20px"></div>
+    </details>`;
+  app().insertBefore(klasmanCard, aiCard);
+
+  let _klasmanLoaded=false;
+  klasmanCard.querySelector('details').addEventListener('toggle',async function(){
+    if(!this.open||_klasmanLoaded) return;
+    _klasmanLoaded=true;
+    const body=document.getElementById('klasman-body');
+    body.innerHTML='<p class="muted" style="padding:4px 0">Yükleniyor…</p>';
+    const local=location.hostname==='localhost'||location.hostname==='127.0.0.1';
+    const url=local?`/api/ikort/${id}/klasman`:`${AI_PROXY_URL}/ikort/${id}/klasman`;
+    const colHdr=`<div style="display:flex;gap:6px;padding:4px 0 6px;border-bottom:2px solid var(--line);font-size:11px;font-weight:600;color:var(--dim);letter-spacing:.04em">
+      <span style="width:14px;flex-shrink:0"></span>
+      <span style="min-width:82px;flex-shrink:0">Tarih</span>
+      <span style="flex:1.4;min-width:0">Alındığı Yer</span>
+      <span class="kl-club" style="flex:1;min-width:0">Kulüp</span>
+      <span style="min-width:110px;flex-shrink:0">Tipi</span>
+      <span style="min-width:36px;text-align:right;flex-shrink:0">Tek</span>
+      <span style="min-width:36px;text-align:right;flex-shrink:0">Çift</span>
+    </div>`;
+    try{
+      const data=await fetch(url).then(r=>r.json());
+      if(data.error){body.innerHTML=`<p class="muted">${esc(data.error)}</p>`;return;}
+      let h='';
+      const s=data.summary||{};
+      const sc=[
+        s.puan!=null?`<div class="card"><div class="v">${s.puan}</div><div class="l">Toplam Puan</div></div>`:'',
+        s.sira!=null?`<div class="card"><div class="v">#${s.sira}</div><div class="l">Genel Sıra</div></div>`:'',
+        s.ulusal!=null?`<div class="card"><div class="v">${s.ulusal}</div><div class="l">Ulusal</div></div>`:'',
+        s.uluslararasi!=null?`<div class="card"><div class="v">${s.uluslararasi}</div><div class="l">Uluslararası</div></div>`:'',
+      ].filter(Boolean);
+      if(sc.length) h+=`<div class="cards" style="margin-bottom:16px">${sc.join('')}</div>`;
+      // Group into sections, skip empty
+      const sections=[];
+      let cur={title:null,rows:[]};
+      for(const row of (data.rows||[])){
+        if(row.type==='header'){if(cur.rows.length||cur.title!==null)sections.push(cur);cur={title:row.cells[0]||'',rows:[]};}
+        else cur.rows.push(row);
+      }
+      if(cur.rows.length||cur.title)sections.push(cur);
+      for(const sect of sections.filter(s=>s.rows.length>0)){
+        if(sect.title) h+=`<div style="font-size:15px;font-weight:700;font-family:var(--font-disp);margin:18px 0 8px;color:var(--txt)">${esc(sect.title)}</div>`;
+        h+=colHdr;
+        for(const row of sect.rows){
+          const c=row.cells;
+          const di=c.findIndex(x=>/\d{2}[-./]\d{2}[-./]\d{4}/.test(x));
+          if(di<0) continue;
+          const counted=row.counted||false;
+          const date=c[di].replace(/\s*\(\d+\)/g,'').trim();
+          const name=c[di+1]||'';
+          const club=c[di+2]||'';
+          const type=c[di+3]||'';
+          const singles=c[di+4]??'—';
+          const doubles=c[di+5]??'—';
+          const sayilanCell=`<span style="width:18px;flex-shrink:0;text-align:center;font-size:11px;color:${counted?'var(--accent-ink)':'var(--line)'}">${counted?'●':'○'}</span>`;
+          const rowBg=counted?'background:var(--accent-soft);border-radius:6px;':'opacity:0.7;';
+          h+=`<div style="display:flex;gap:6px;padding:5px 4px;border-bottom:1px solid var(--line);font-size:13px;align-items:center;${rowBg}">
+            ${sayilanCell}
+            <span style="min-width:82px;flex-shrink:0;color:var(--dim);font-size:12px;font-family:var(--font-mono)">${esc(date)}</span>
+            <span style="flex:1.4;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:${counted?'600':'400'}" title="${esc(name)}">${esc(name)}</span>
+            <span class="kl-club" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dim);font-size:12px" title="${esc(club)}">${esc(club)}</span>
+            <span style="min-width:110px;flex-shrink:0;color:var(--accent-ink);font-size:12px;font-weight:500">${esc(type)}</span>
+            <span style="min-width:36px;text-align:right;flex-shrink:0;font-family:var(--font-mono);font-weight:700;color:var(--win)">${esc(String(singles))}</span>
+            <span style="min-width:36px;text-align:right;flex-shrink:0;font-family:var(--font-mono);color:var(--dim)">${esc(String(doubles))}</span>
+          </div>`;
+        }
+      }
+      if(!h) h='<p class="muted">Veri bulunamadı.</p>';
+      body.innerHTML=h;
+    }catch(e){
+      body.innerHTML='<p class="muted">Yüklenemedi.</p>';
+    }
+  });
 }
 
 const AI_PROXY_URL='https://kortex-groq.bahadiruner82.workers.dev';
