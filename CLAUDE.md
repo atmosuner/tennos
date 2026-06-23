@@ -107,6 +107,11 @@ change in `serve.py` must be mirrored in the `dbApi` block, and vice versa.
 After data changes: run `build_web_db.py` + `gzip -9 -f work/web/tennos-web.db` to
 refresh the browser DB.
 
+**Cache-busting:** `bootDB` fetches `tennos-web.db.gz?v=<DB_SCHEMA_VER>`. When the web
+DB shape changes (new column/table), **bump `DB_SCHEMA_VER`** in that fetch — otherwise
+returning visitors run the new SQL against a browser-cached old DB and get
+`no such column ...`. Data-only refreshes (no schema change) don't need a bump.
+
 Score rendering: `sets.p1/p2` follow the match's player order, not winner-first. `matches`
 stores `p1_id`/`p2_id`; `build_score` orients the score by whether the viewer is `p1_id`
 (passing `won` instead is the classic bug — it reverses scores for losers shown as p1).
