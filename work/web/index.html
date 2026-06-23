@@ -384,7 +384,10 @@ syncPalBtns();
     if(DB) return;
     document.getElementById('app').innerHTML='<div class="loading">yükleniyor…</div>';
     const SQL=await initSqlJs({locateFile:f=>`https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/${f}`});
-    const resp=await fetch('tennos-web.db.gz');
+    // Cache-bust on schema change: bump DB_SCHEMA_VER whenever the web DB columns/tables
+    // change, so returning visitors re-download instead of running new SQL on an old DB.
+    const DB_SCHEMA_VER='2026-06-23-abbrev-kp';
+    const resp=await fetch('tennos-web.db.gz?v='+DB_SCHEMA_VER);
     if(!resp.ok) throw new Error('db indirilemedi');
     let buf;
     if(resp.headers.get('content-encoding')||resp.headers.get('content-type')==='application/x-gzip'){
