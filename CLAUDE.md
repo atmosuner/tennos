@@ -102,17 +102,28 @@ Static files under `work/web/` are served by `send_file`, which sets MIME from a
 extension map (`.html/.js/.css/.svg/.png/.json`) — anything else is `octet-stream`, so a
 new static asset type that must render in-browser (e.g. `.svg`) needs adding there.
 
-**`index.html` always uses `dbApi` (in-browser sql.js against `tennos-web.db.gz`).** The
+**`index.html` always uses `dbApi` (in-browser sql.js, split across two DBs).** The
 `serve.py` JSON API endpoints exist for direct testing (curl etc.) but the UI never hits
 them — `const api=p=>window.dbApi(p)` is hardcoded. Keep the two in sync: any endpoint
 change in `serve.py` must be mirrored in the `dbApi` block, and vice versa.
-`work/build_web_db.py` produces the slimmed browser DB; see `work/web/DEPLOY.md`.
-After data changes: run `build_web_db.py` + `gzip -9 -f work/web/tennos-web.db` to
-refresh the browser DB.
+`work/build_web_db.py` produces the browser DBs; see `work/web/DEPLOY.md`.
+After data changes: run `build_web_db.py` + `gzip -9 -f work/web/tennos-web.db
+work/web/tennos-web-detail.db` to refresh both browser DBs.
 
-**Cache-busting:** `bootDB` fetches `tennos-web.db.gz?v=<DB_SCHEMA_VER>`. When the web
-DB shape changes (new column/table), **bump `DB_SCHEMA_VER`** in that fetch — otherwise
-returning visitors run the new SQL against a browser-cached old DB and get
+**Browser DB is split core/detail for fast first paint.** `tennos-web.db.gz` ("core":
+clubs/players/tournaments/player_ratings + a `web_precomputed` table holding the home
+page's stats, computed once in `build_web_db.py` rather than via live correlated
+subqueries) loads eagerly in `bootDB`. `tennos-web-detail.db.gz` (matches/sets/
+klasman_puan/player_rating_history, plus a self-contained copy of the core tables since
+sql.js can't ATTACH a second DB from bytes) loads lazily via `window.ensureDetail()`,
+triggered by the `NEEDS_DETAIL` route set in the `dbApi` dispatcher (rankings, player,
+tournament, h2h, common, club_opponents, club_vs_club). If you add an endpoint that
+queries matches/sets/klasman_puan/player_rating_history, add its route name to
+`NEEDS_DETAIL` too, or it'll throw "no such table" against the core-only DB.
+
+**Cache-busting:** `bootDB`/`ensureDetail` fetch `tennos-web(-detail).db.gz?v=<DB_SCHEMA_VER>`.
+When either web DB's shape changes (new column/table/index), **bump `DB_SCHEMA_VER`** —
+otherwise returning visitors run new SQL against a browser-cached old DB and get
 `no such column ...`. Data-only refreshes (no schema change) don't need a bump.
 
 **Theming / palettes:** light + dark theme × four palettes, one per Grand Slam court

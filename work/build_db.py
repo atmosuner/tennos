@@ -66,7 +66,9 @@ CREATE TABLE tournaments (
     year           INTEGER,
     source_tab     TEXT,
     image_url      TEXT,
-    scraped_at     TEXT
+    scraped_at     TEXT,
+    match_count    INTEGER DEFAULT 0,
+    player_count   INTEGER DEFAULT 0
 );
 
 CREATE TABLE clubs (
@@ -231,6 +233,31 @@ def populate_club_abbrev(cur: sqlite3.Cursor, unique_map: dict[str, int]) -> int
     return cur.execute("SELECT count(*) FROM clubs WHERE abbrev IS NOT NULL").fetchone()[0]
 
 
+def populate_tournament_counts(cur: sqlite3.Cursor) -> None:
+    """Denormalize match_count/player_count onto tournaments so the web frontend
+    doesn't run a correlated subquery over matches per row on every list render."""
+    cur.execute(
+        """
+        UPDATE tournaments SET match_count = (
+            SELECT count(*) FROM matches m
+            WHERE m.tournament_id = tournaments.tournament_id
+              AND m.winner_id IS NOT NULL AND m.loser_id IS NOT NULL
+        )
+        """
+    )
+    cur.execute(
+        """
+        UPDATE tournaments SET player_count = (
+            SELECT count(*) FROM (
+                SELECT winner_id v FROM matches WHERE tournament_id = tournaments.tournament_id AND winner_id IS NOT NULL
+                UNION
+                SELECT loser_id FROM matches WHERE tournament_id = tournaments.tournament_id AND loser_id IS NOT NULL
+            )
+        )
+        """
+    )
+
+
 def insert_players(cur: sqlite3.Cursor) -> int:
     players = load_json(OUTPUTS / "players.json", {"players": []})["players"]
     cur.executemany(
@@ -331,7 +358,7 @@ def main() -> int:
         club = fields.get("kulup") if isinstance(fields.get("kulup"), dict) else {}
         tid = int_or_none(tour.get("turnuvaId"))
         cur.execute(
-            "INSERT OR REPLACE INTO tournaments VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "INSERT OR REPLACE INTO tournaments VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,0)",
             (
                 tid, tour.get("name"), tour.get("title"), tour.get("typeText"), fields.get("kategori"),
                 fields.get("yer"), fields.get("zemin"), fields.get("kortTipi"), fields.get("bolgeTipi"),
@@ -409,6 +436,7 @@ def main() -> int:
 
     n_backfilled_players = backfill_missing_players(cur)
     n_club_abbrev = populate_club_abbrev(cur, unique_map)
+    populate_tournament_counts(cur)
 
     cur.executescript(INDEXES)
     conn.commit()

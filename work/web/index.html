@@ -424,16 +424,32 @@ syncPalBtns();
 <script>
 // ===== Client-side SQLite (sql.js). Mirrors the old serve.py JSON API. =====
 (function(){
-  let DB=null;
-  window.bootDB=async function(){
-    if(DB) return;
-    document.getElementById('app').innerHTML='<div class="loading">yükleniyor…</div>';
-    const SQL=await initSqlJs({locateFile:f=>`https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/${f}`});
-    // Cache-bust on schema change: bump DB_SCHEMA_VER whenever the web DB columns/tables
-    // change, so returning visitors re-download instead of running new SQL on an old DB.
-    const DB_SCHEMA_VER='2026-06-23-noidx';
-    const resp=await fetch('tennos-web.db.gz?v='+DB_SCHEMA_VER);
-    if(!resp.ok) throw new Error('db indirilemedi');
+  let DB=null, SQL=null, detailPromise=null;
+  // Cache-bust on schema change: bump DB_SCHEMA_VER whenever the web DB columns/tables
+  // change, so returning visitors re-download instead of running new SQL on an old DB.
+  const DB_SCHEMA_VER='2026-06-23-split';
+  // build_web_db.py strips non-PK indexes from both shipped .db files to cut download
+  // size (~35% smaller); rebuild them here so query performance matches the source DB.
+  // Keep these lists in sync with build_web_db.py's index drop.
+  const CORE_INDEX_SQL=`
+    CREATE INDEX IF NOT EXISTS idx_players_club ON players(club_id);
+    CREATE INDEX IF NOT EXISTS idx_ratings_cat ON player_ratings(gender, age_group, age_group_rank);
+    CREATE INDEX IF NOT EXISTS idx_ratings_gender ON player_ratings(gender, gender_rank);
+    CREATE INDEX IF NOT EXISTS idx_ratings_rating ON player_ratings(rating DESC);
+  `;
+  const DETAIL_INDEX_SQL=CORE_INDEX_SQL+`
+    CREATE INDEX IF NOT EXISTS idx_kp_player ON klasman_puan(player_id);
+    CREATE INDEX IF NOT EXISTS idx_kp_week ON klasman_puan(year, week, type, gender);
+    CREATE INDEX IF NOT EXISTS idx_match_tournament ON matches(tournament_id);
+    CREATE INDEX IF NOT EXISTS idx_match_event ON matches(age_group, gender);
+    CREATE INDEX IF NOT EXISTS idx_match_winner ON matches(winner_id);
+    CREATE INDEX IF NOT EXISTS idx_match_loser ON matches(loser_id);
+    CREATE INDEX IF NOT EXISTS idx_sets_match ON sets(match_id);
+    CREATE INDEX IF NOT EXISTS idx_rh_player ON player_rating_history(player_id);
+  `;
+  async function fetchDB(file){
+    const resp=await fetch(file+'?v='+DB_SCHEMA_VER);
+    if(!resp.ok) throw new Error('db indirilemedi: '+file);
     let buf;
     if(resp.headers.get('content-encoding')||resp.headers.get('content-type')==='application/x-gzip'){
       buf=await resp.arrayBuffer(); // already decoded by browser
@@ -443,24 +459,25 @@ syncPalBtns();
     } else {
       buf=await ungzip(resp);
     }
-    DB=new SQL.Database(new Uint8Array(buf));
-    // build_web_db.py strips these from the shipped .db to cut download size (~35%
-    // smaller); rebuild them here so query performance matches the server-side DB.
-    // Keep this list in sync with build_web_db.py's index drop.
-    DB.exec(`
-      CREATE INDEX IF NOT EXISTS idx_kp_player ON klasman_puan(player_id);
-      CREATE INDEX IF NOT EXISTS idx_kp_week ON klasman_puan(year, week, type, gender);
-      CREATE INDEX IF NOT EXISTS idx_match_tournament ON matches(tournament_id);
-      CREATE INDEX IF NOT EXISTS idx_match_event ON matches(age_group, gender);
-      CREATE INDEX IF NOT EXISTS idx_match_winner ON matches(winner_id);
-      CREATE INDEX IF NOT EXISTS idx_match_loser ON matches(loser_id);
-      CREATE INDEX IF NOT EXISTS idx_sets_match ON sets(match_id);
-      CREATE INDEX IF NOT EXISTS idx_players_club ON players(club_id);
-      CREATE INDEX IF NOT EXISTS idx_ratings_cat ON player_ratings(gender, age_group, age_group_rank);
-      CREATE INDEX IF NOT EXISTS idx_ratings_gender ON player_ratings(gender, gender_rank);
-      CREATE INDEX IF NOT EXISTS idx_ratings_rating ON player_ratings(rating DESC);
-      CREATE INDEX IF NOT EXISTS idx_rh_player ON player_rating_history(player_id);
-    `);
+    return new SQL.Database(new Uint8Array(buf));
+  }
+  // Core db (clubs/players/tournaments/player_ratings/web_precomputed) — small, fetched
+  // on every page load. Covers home, rankings/club/tournament *lists*, search, compare-clubs.
+  window.bootDB=async function(){
+    if(DB) return;
+    document.getElementById('app').innerHTML='<div class="loading">yükleniyor…</div>';
+    SQL=await initSqlJs({locateFile:f=>`https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/${f}`});
+    DB=await fetchDB('tennos-web.db.gz');
+    DB.exec(CORE_INDEX_SQL);
+  };
+  // Detail db (matches/sets/klasman_puan/player_rating_history, plus a self-contained copy
+  // of the core tables — sql.js has no ATTACH-from-bytes, so it can't join across two
+  // separately-loaded files). Fetched lazily on first navigation to a page that needs
+  // match-level data (rankings' kp column, player profile, tournament detail, h2h, compare).
+  window.ensureDetail=function(){
+    if(detailPromise) return detailPromise;
+    detailPromise=fetchDB('tennos-web-detail.db.gz').then(db=>{db.exec(DETAIL_INDEX_SQL);DB=db;});
+    return detailPromise;
   };
   async function ungzip(resp,pre){
     const stream=(pre?new Response(pre):resp).body.pipeThrough(new DecompressionStream('gzip'));
@@ -544,56 +561,12 @@ syncPalBtns();
   }
 
   const ep={
-    stats(){
-      const c=new Date();c.setMonth(c.getMonth()-6);
-      const cs=c.getFullYear()+String(c.getMonth()+1).padStart(2,'0')+String(c.getDate()).padStart(2,'0');
-      const af=`SUBSTR(last_match_date,7,4)||SUBSTR(last_match_date,4,2)||SUBSTR(last_match_date,1,2)>='${cs}'`;
-      const byAgeGender=Q(`SELECT age_group,gender,count(*) n FROM player_ratings WHERE age_group IS NOT NULL AND gender IS NOT NULL AND ${af} GROUP BY age_group,gender ORDER BY age_group,gender`)
-        .map(c=>({...c,top3:Q(`SELECT player_id,name,rating,club_name FROM player_ratings WHERE age_group=? AND gender=? AND ${af} ORDER BY rating DESC LIMIT 3`,[c.age_group,c.gender])}));
-      return {players:scalar('SELECT count(*) FROM players'),ratedPlayers:scalar('SELECT count(*) FROM player_ratings'),
-        activeRatedPlayers:scalar(`SELECT count(*) FROM player_ratings`),
-        clubs:scalar('SELECT count(*) FROM clubs'),tournaments:scalar('SELECT count(*) FROM tournaments'),
-        matches:scalar('SELECT count(*) FROM matches'),completed:scalar("SELECT count(*) FROM matches WHERE result_type='completed'"),
-        byAgeGender};
-    },
-    homeInsights(){
-      const ac=new Date();ac.setMonth(ac.getMonth()-6);
-      const acs=ac.getFullYear()+String(ac.getMonth()+1).padStart(2,'0')+String(ac.getDate()).padStart(2,'0');
-      const af=(p='')=>`SUBSTR(${p}last_match_date,7,4)||SUBSTR(${p}last_match_date,4,2)||SUBSTR(${p}last_match_date,1,2)>='${acs}'`;
-      const year=scalar("SELECT MAX(SUBSTR(match_date,7,4)) FROM matches WHERE match_date<>''")||'';
-      const yf="SUBSTR(match_date,7,4)=?";
-      const MONTHS=['','Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
-      const busiest=one(`SELECT SUBSTR(match_date,4,2) mo,count(*) n FROM matches WHERE ${yf} AND match_date<>'' GROUP BY mo ORDER BY n DESC LIMIT 1`,[year]);
-      const topCat=one(`SELECT age_group,gender,count(*) n FROM matches WHERE ${yf} AND age_group IS NOT NULL AND gender<>'' GROUP BY age_group,gender ORDER BY n DESC LIMIT 1`,[year]);
-      const season={year,
-        matches:scalar(`SELECT count(*) FROM matches WHERE ${yf}`,[year]),
-        completed:scalar(`SELECT count(*) FROM matches WHERE ${yf} AND result_type='completed'`,[year]),
-        tournaments:scalar('SELECT count(*) FROM tournaments WHERE year=?',[+year]),
-        busiestMonth:busiest?MONTHS[+busiest.mo]:'—',
-        topCategory:topCat?`${topCat.age_group} Yaş ${topCat.gender}`:'—'};
-      const records={
-        peak:one(`SELECT player_id,name,round(peak_rating) v FROM player_ratings ORDER BY peak_rating DESC LIMIT 1`),
-        mostMatches:one(`SELECT player_id,name,matches v FROM player_ratings ORDER BY matches DESC LIMIT 1`),
-        youngest:one(`SELECT player_id,name,birth_year v,round(rating) rating FROM player_ratings WHERE matches>=5 AND birth_year IS NOT NULL ORDER BY birth_year DESC,rating DESC LIMIT 1`),
-        bestPct:one(`SELECT player_id,name,wins,losses,round(wins*100.0/matches) v FROM player_ratings WHERE matches>=30 ORDER BY wins*1.0/matches DESC LIMIT 1`),
-        mostTournaments:one(`WITH pt AS (SELECT player_id,count(DISTINCT tournament_id) v FROM (SELECT winner_id player_id,tournament_id FROM matches WHERE winner_id IS NOT NULL AND tournament_id IS NOT NULL UNION ALL SELECT loser_id player_id,tournament_id FROM matches WHERE loser_id IS NOT NULL AND tournament_id IS NOT NULL) GROUP BY player_id)
-          SELECT pr.player_id,pr.name,pt.v FROM player_ratings pr JOIN pt ON pt.player_id=pr.player_id ORDER BY pt.v DESC LIMIT 1`),
-        biggestRise:(()=>{const r=one(`WITH h AS (SELECT player_id,rating_after,SUBSTR(match_date,7,4)||SUBSTR(match_date,4,2)||SUBSTR(match_date,1,2) dk FROM player_rating_history),
-          strt AS (SELECT player_id,count(*) c,MIN(dk) mindk FROM h GROUP BY player_id)
-          SELECT pr.player_id,pr.name,CAST(round(pr.rating-(SELECT rating_after FROM h WHERE h.player_id=strt.player_id AND h.dk=strt.mindk LIMIT 1)) AS INTEGER) v
-          FROM strt JOIN player_ratings pr ON pr.player_id=strt.player_id WHERE strt.c>=5 ORDER BY v DESC LIMIT 1`);
-          if(r&&r.v!=null) r.v=(r.v>0?'+':'')+r.v; return r;})()};
-      const topClubs=Q(`SELECT club_id,club_name,sum(wins) w,sum(losses) l,round(sum(wins)*100.0/(sum(wins)+sum(losses))) pct,count(*) n FROM player_ratings WHERE club_id IS NOT NULL AND club_name<>'' AND matches>=5 AND ${af()} GROUP BY club_id HAVING n>=20 AND (w+l)>0 ORDER BY pct DESC LIMIT 8`);
-      const maxBirth=scalar(`SELECT MAX(birth_year) FROM player_ratings WHERE matches>=5 AND ${af()}`);
-      const youngTalents=Q(`SELECT player_id,name,birth_year,rating,club_name FROM player_ratings WHERE birth_year>=? AND matches>=5 AND ${af()} ORDER BY rating DESC LIMIT 10`,[maxBirth-1]);
-      const upsets=Q(`SELECT m.winner_id,wr.name wn,round(wr.rating) wrating,m.loser_id,lr.name ln,round(lr.rating) lrating,round(lr.rating-wr.rating) gap,m.match_date,m.event
-        FROM matches m JOIN player_ratings wr ON wr.player_id=m.winner_id JOIN player_ratings lr ON lr.player_id=m.loser_id
-        WHERE m.result_type='completed' AND wr.matches>=10 AND lr.matches>=10 AND ${af('wr.')} AND ${af('lr.')} AND lr.rating-wr.rating>0
-        ORDER BY gap DESC LIMIT 6`);
-      const cohorts=Q(`SELECT birth_year,round(avg(rating)) avg,count(*) n FROM player_ratings WHERE birth_year IS NOT NULL AND matches>=5 AND ${af()} GROUP BY birth_year HAVING n>=20 ORDER BY birth_year DESC LIMIT 8`);
-      const cities=Q(`SELECT p.city,count(*) n FROM player_ratings pr JOIN players p ON p.player_id=pr.player_id WHERE p.city<>'' AND p.city IS NOT NULL GROUP BY p.city ORDER BY n DESC LIMIT 10`);
-      return {season,records,topClubs,youngTalents,upsets,cohorts,cities};
-    },
+    // Precomputed at build time in build_web_db.py (same SQL, ported to Python) and
+    // shipped in the core db's web_precomputed table — keeps the home page (the default
+    // landing route) from ever touching matches/player_rating_history, so it never needs
+    // the detail db. Re-run build_web_db.py to refresh after a data update.
+    stats(){ return JSON.parse(one('SELECT json FROM web_precomputed WHERE key=?',['stats']).json); },
+    homeInsights(){ return JSON.parse(one('SELECT json FROM web_precomputed WHERE key=?',['homeInsights']).json); },
     rankings(q){
       const w=['1=1'],p=[];
       if(q.age_group){w.push('pr.age_group=?');p.push(+q.age_group);}
@@ -681,13 +654,11 @@ syncPalBtns();
       if(q.year){w.push('t.year=?');p.push(+q.year);}
       if(q.age_group){w.push('EXISTS(SELECT 1 FROM matches mx WHERE mx.tournament_id=t.tournament_id AND mx.age_group=?)');p.push(+q.age_group);}
       const lim=Math.min(+(q.limit||700),700),wc=w.join(' AND ');
-      const mcSql=`(SELECT count(*) FROM matches m WHERE m.tournament_id=t.tournament_id AND m.winner_id IS NOT NULL AND m.loser_id IS NOT NULL)`;
-      const pcSql=`(SELECT count(*) FROM (SELECT winner_id v FROM matches WHERE tournament_id=t.tournament_id AND winner_id IS NOT NULL UNION SELECT loser_id FROM matches WHERE tournament_id=t.tournament_id AND loser_id IS NOT NULL))`;
       const dord=`SUBSTR(REPLACE(t.start_date,' ',''),7,4)||SUBSTR(REPLACE(t.start_date,' ',''),4,2)||SUBSTR(REPLACE(t.start_date,' ',''),1,2)`;
-      const order=q.sort==='size'?`${mcSql} DESC, ${dord} DESC, t.tournament_id DESC`:`${dord} DESC, t.tournament_id DESC`;
+      const order=q.sort==='size'?`t.match_count DESC, ${dord} DESC, t.tournament_id DESC`:`${dord} DESC, t.tournament_id DESC`;
       const rows=Q(`SELECT t.tournament_id,t.name,t.title,t.city,t.start_date,t.year,t.type_text,t.surface,t.court_type,t.source_tab,c.name club_name,
-        ${mcSql} match_count, ${pcSql} player_count
-        FROM tournaments t LEFT JOIN clubs c ON c.club_id=t.club_id WHERE ${wc} AND (${mcSql}>0 OR t.source_tab='guncel')
+        t.match_count, t.player_count
+        FROM tournaments t LEFT JOIN clubs c ON c.club_id=t.club_id WHERE ${wc} AND (t.match_count>0 OR t.source_tab='guncel')
         ORDER BY ${order} LIMIT ?`,[...p,lim]);
       const years=Q('SELECT DISTINCT year FROM tournaments WHERE year IS NOT NULL ORDER BY year DESC').map(r=>r.year);
       const age_groups=Q('SELECT DISTINCT age_group FROM matches WHERE age_group IS NOT NULL ORDER BY age_group').map(r=>r.age_group);
@@ -830,6 +801,10 @@ syncPalBtns();
     const parts=path.split('/').filter(Boolean);
     const q={}; (query||'').split('&').forEach(kv=>{if(!kv)return;const i=kv.indexOf('=');q[decodeURIComponent(kv.slice(0,i))]=decodeURIComponent(kv.slice(i+1));});
     const r=parts[0];
+    // These touch matches/sets/klasman_puan/player_rating_history, only present in the
+    // lazily-fetched detail db (see window.ensureDetail in the bootDB block above).
+    const NEEDS_DETAIL=new Set(['rankings','player','h2h','common','tournament','club_opponents','club_vs_club']);
+    if(NEEDS_DETAIL.has(r)) await window.ensureDetail();
     if(r==='stats') return ep.stats();
     if(r==='homeInsights') return ep.homeInsights();
     if(r==='rankings') return ep.rankings(q);
@@ -853,6 +828,14 @@ syncPalBtns();
 const $=s=>document.querySelector(s), app=()=>$('#app');
 const api=p=>window.dbApi(p);
 const esc=s=>(s==null?'':String(s)).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+function pagerHtml(page,pages,fn){
+  const btn=(n,label,disabled)=>`<button ${disabled?'disabled':''} onclick="${fn}(${n})" style="padding:7px 13px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:${disabled?'var(--dim)':'var(--txt)'};font-size:13px;cursor:${disabled?'default':'pointer'}">${label}</button>`;
+  return `<div style="display:flex;align-items:center;gap:8px;justify-content:center;margin-top:18px">
+    ${btn(page-1,'‹ Önceki',page<=1)}
+    <span style="font-family:var(--font-mono);font-size:12.5px;color:var(--dim)">${page} / ${pages}</span>
+    ${btn(page+1,'Sonraki ›',page>=pages)}
+  </div>`;
+}
 function toggleSection(id){const el=document.getElementById(id),btn=document.getElementById('tog-'+id);if(!el)return;const open=el.style.display!=='none';el.style.display=open?'none':'';if(btn)btn.textContent=open?'▶':'▼';}
 function sortTable(th){
   const tbl=th.closest('table'),tbody=tbl.querySelector('tbody');if(!tbody)return;
@@ -1848,9 +1831,11 @@ async function h2h(a,b){
 }
 
 // ---------- Clubs ----------
+const CLUB_PAGE_SIZE=60;
 async function clubs(params){
   params=params||{};
   let sort=params.sort||'players', city=params.city||'', term=params.q||'';
+  let page=Math.max(1,+params.page||1);
   app().innerHTML=`<div style="font-family:var(--font-mono);font-size:11.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--accent-ink);margin-bottom:4px">KULÜP DİZİNİ</div>
     <h1 style="margin:0 0 16px">Kulüpler</h1>
     <div class="filters">
@@ -1864,10 +1849,14 @@ async function clubs(params){
       </select>
     </div>
     <div id="cl" class="loading">yükleniyor…</div>`;
-  const load=async()=>{const d=await api('/clubs'+qs({q:$('#cq').value||'',city:$('#cCity').value,sort:$('#cSort').value,limit:300}));
+  const load=async()=>{const d=await api('/clubs'+qs({q:$('#cq').value||'',city:$('#cCity').value,sort:$('#cSort').value,limit:600}));
     if(!$('#cCity').dataset.filled){$('#cCity').innerHTML='<option value="">Tüm Şehirler</option>'+(d.cities||[]).map(c=>`<option value="${esc(c)}" ${c==city?'selected':''}>${esc(c)}</option>`).join('');$('#cCity').dataset.filled='1';}
-    $('#cl').outerHTML=`<div id="cl"><p class="muted" style="margin:0 0 12px">${d.clubs.length} kulüp</p><div class="club-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,250px),1fr));gap:13px">
-      ${d.clubs.map(c=>{const tot=c.total_wins+c.total_losses,pct=tot>=20?Math.round(c.total_wins/tot*100):null,pctRaw=tot?Math.round(c.total_wins/tot*100):null;
+    const pages=Math.max(1,Math.ceil(d.clubs.length/CLUB_PAGE_SIZE));
+    page=Math.min(page,pages);
+    const pageRows=d.clubs.slice((page-1)*CLUB_PAGE_SIZE,page*CLUB_PAGE_SIZE);
+    window.clubGoPage=n=>{page=n;render();};
+    const render=()=>{$('#cl').outerHTML=`<div id="cl"><p class="muted" style="margin:0 0 12px">${d.clubs.length} kulüp${pages>1?` · sayfa ${page}/${pages}`:''}</p><div class="club-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,250px),1fr));gap:13px">
+      ${pageRows.map(c=>{const tot=c.total_wins+c.total_losses,pct=tot>=20?Math.round(c.total_wins/tot*100):null,pctRaw=tot?Math.round(c.total_wins/tot*100):null;
         return`<div class="card" style="cursor:pointer;padding:16px 18px;min-width:0" onclick="location.hash='#/club/${c.club_id}'">
         <div style="display:flex;align-items:baseline;gap:8px"><div style="font-weight:700;letter-spacing:-.01em;font-size:16px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.name)}</div>${c.abbrev?`<span style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--accent2);flex-shrink:0">${esc(c.abbrev)}</span>`:''}</div>
         <div style="color:var(--dim);font-size:12px;margin-top:2px;margin-bottom:14px">${esc(c.city||'—')}</div>
@@ -1878,10 +1867,14 @@ async function clubs(params){
           <div><div style="font-family:var(--font-mono);font-size:18px;font-weight:700;color:${pct!=null?'var(--gold)':'var(--dim)'}" title="${pct==null&&pctRaw!=null?'<20 maç, güvenilir değil: %'+pctRaw:''}">${pct!=null?pct+'%':(pctRaw!=null?'·':'—')}</div><div style="font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;font-weight:700">G%</div></div>
         </div>
       </div>`;}).join('')}
-      </div></div>`;};
-  const nav=()=>location.hash='#/clubs'+qs({q:$('#cq').value,city:$('#cCity').value,sort:$('#cSort').value});
+      </div>
+      ${pages>1?pagerHtml(page,pages,'window.clubGoPage'):''}
+      </div>`;};
+    render();
+  };
+  const nav=()=>{page=1;location.hash='#/clubs'+qs({q:$('#cq').value,city:$('#cCity').value,sort:$('#cSort').value});};
   $('#cCity').onchange=nav; $('#cSort').onchange=nav;
-  let t; $('#cq').oninput=e=>{clearTimeout(t);t=setTimeout(load,300);};
+  let t; $('#cq').oninput=e=>{clearTimeout(t);t=setTimeout(nav,300);};
   load();
 }
 
@@ -2059,9 +2052,11 @@ async function players_dir(params){
 
 // ---------- Tournaments ----------
 function isWeekendTour(t){ return /haftasonu|lig/i.test((t.name||'')+' '+(t.title||'')+' '+(t.type_text||'')); }
+const TOUR_PAGE_SIZE=48;
 async function tournaments(params){
   const yr=params.year||'', term=params.q||'', incl=params.include_ongoing||'', ag=params.age_group||'', city=params.city||'', sort=params.sort||'date';
-  const nav=()=>location.hash='#/tournaments'+qs({year:$('#tYear').value,q:$('#tQ').value,age_group:$('#tAg').value,city:$('#tCity').value,sort:$('#tSort').value,include_ongoing:$('#tOngoing').checked?'1':''});
+  let page=Math.max(1,+params.page||1);
+  const nav=(resetPage)=>location.hash='#/tournaments'+qs({year:$('#tYear').value,q:$('#tQ').value,age_group:$('#tAg').value,city:$('#tCity').value,sort:$('#tSort').value,include_ongoing:$('#tOngoing').checked?'1':'',page:resetPage?'':page});
   app().innerHTML=`<div style="font-family:var(--font-mono);font-size:11.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--accent-ink);margin-bottom:4px">TURNUVALAR</div>
     <h1 style="margin:0 0 16px">Turnuvalar</h1>
     <div class="filters">
@@ -2077,11 +2072,15 @@ async function tournaments(params){
   $('#tYear').innerHTML='<option value="">Tüm Yıllar</option>'+d.years.map(y=>`<option value="${y}" ${y==yr?'selected':''}>${y}</option>`).join('');
   $('#tAg').innerHTML='<option value="">Tüm Yaş Grupları</option>'+(d.age_groups||[]).map(a=>`<option value="${a}" ${a==ag?'selected':''}>${a} Yaş</option>`).join('');
   $('#tCity').innerHTML='<option value="">Tüm Şehirler</option>'+(d.cities||[]).map(c=>`<option value="${esc(c)}" ${c==city?'selected':''}>${esc(c)}</option>`).join('');
-  $('#tYear').onchange=nav; $('#tAg').onchange=nav; $('#tCity').onchange=nav; $('#tSort').onchange=nav; $('#tOngoing').onchange=nav;
-  let t; $('#tQ').oninput=e=>{clearTimeout(t);t=setTimeout(nav,350);};
-  $('#tl').outerHTML=`<div id="tl"><p class="muted" style="margin:0 0 12px">${d.total} turnuva</p>
+  $('#tYear').onchange=()=>nav(true); $('#tAg').onchange=()=>nav(true); $('#tCity').onchange=()=>nav(true); $('#tSort').onchange=()=>nav(true); $('#tOngoing').onchange=()=>nav(true);
+  let t; $('#tQ').oninput=e=>{clearTimeout(t);t=setTimeout(()=>nav(true),350);};
+  const pages=Math.max(1,Math.ceil(d.tournaments.length/TOUR_PAGE_SIZE));
+  page=Math.min(page,pages);
+  const pageRows=d.tournaments.slice((page-1)*TOUR_PAGE_SIZE,page*TOUR_PAGE_SIZE);
+  window.tourGoPage=n=>{page=n;nav();};
+  $('#tl').outerHTML=`<div id="tl"><p class="muted" style="margin:0 0 12px">${d.total} turnuva${pages>1?` · sayfa ${page}/${pages}`:''}</p>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:13px">
-    ${d.tournaments.map(t=>{const wknd=isWeekendTour(t);return `<div class="card" style="cursor:pointer;padding:16px 18px;${wknd?'border-left:3px solid var(--accent2)':''}" onclick="location.hash='#/tournament/${t.tournament_id}'">
+    ${pageRows.map(t=>{const wknd=isWeekendTour(t);return `<div class="card" style="cursor:pointer;padding:16px 18px;${wknd?'border-left:3px solid var(--accent2)':''}" onclick="location.hash='#/tournament/${t.tournament_id}'">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
         ${t.source_tab==='guncel'?'<span style="display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:7px;background:var(--win-soft);color:var(--win);font-size:11px;font-weight:700"><span style="width:7px;height:7px;border-radius:50%;background:var(--win)"></span>Canlı</span>':''}
         ${wknd?'<span style="padding:2px 9px;border-radius:7px;background:var(--accent2-soft);color:var(--accent2);font-size:11px;font-weight:700">Hafta Sonu / Lig</span>':''}
@@ -2095,7 +2094,9 @@ async function tournaments(params){
         <span class="pill" style="background:var(--accent2-soft);color:var(--accent2);font-family:var(--font-mono)">${t.match_count||0} maç</span>
       </div>
     </div>`;}).join('')}
-    </div></div>`;
+    </div>
+    ${pages>1?pagerHtml(page,pages,'window.tourGoPage'):''}
+    </div>`;
 }
 
 async function tournament(id){

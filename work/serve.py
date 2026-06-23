@@ -551,15 +551,13 @@ class Handler(BaseHTTPRequestHandler):
         if q.get("age_group"):
             where.append("EXISTS(SELECT 1 FROM matches mx WHERE mx.tournament_id=t.tournament_id AND mx.age_group=?)"); params.append(int(q["age_group"]))
         limit = min(int(q.get("limit", 700)), 700)
-        mc_sql = "(SELECT count(*) FROM matches m WHERE m.tournament_id=t.tournament_id AND m.winner_id IS NOT NULL AND m.loser_id IS NOT NULL)"
-        pc_sql = "(SELECT count(*) FROM (SELECT winner_id v FROM matches WHERE tournament_id=t.tournament_id AND winner_id IS NOT NULL UNION SELECT loser_id FROM matches WHERE tournament_id=t.tournament_id AND loser_id IS NOT NULL))"
         dord = "SUBSTR(REPLACE(t.start_date,' ',''),7,4)||SUBSTR(REPLACE(t.start_date,' ',''),4,2)||SUBSTR(REPLACE(t.start_date,' ',''),1,2)"
-        order = f"{mc_sql} DESC, {dord} DESC, t.tournament_id DESC" if q.get("sort") == "size" else f"{dord} DESC, t.tournament_id DESC"
+        order = f"t.match_count DESC, {dord} DESC, t.tournament_id DESC" if q.get("sort") == "size" else f"{dord} DESC, t.tournament_id DESC"
         sql = f"""
             SELECT t.tournament_id, t.name, t.title, t.city, t.start_date, t.year, t.type_text, t.surface, t.court_type,
-                   t.source_tab, c.name AS club_name, {mc_sql} AS match_count, {pc_sql} AS player_count
+                   t.source_tab, c.name AS club_name, t.match_count, t.player_count
             FROM tournaments t LEFT JOIN clubs c ON c.club_id=t.club_id
-            WHERE {' AND '.join(where)} AND ({mc_sql}>0 OR t.source_tab='guncel')
+            WHERE {' AND '.join(where)} AND (t.match_count>0 OR t.source_tab='guncel')
             ORDER BY {order} LIMIT ?
         """
         rows = rows_to_dicts(conn.execute(sql, (*params, limit)).fetchall())
