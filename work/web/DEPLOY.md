@@ -7,7 +7,10 @@ from a CDN). There is no backend to host.
 ## Files served (everything in `work/web/`)
 
 - `index.html` — the single-page app (vanilla JS, hash routing)
-- `tennos-web.db.gz` — gzipped SQLite database (~10 MB), decompressed in the browser
+- `tennos-web.db.gz` — gzipped SQLite database (~46 MB as of 2026-06, grows with data),
+  decompressed in the browser. Non-PK indexes are stripped before gzipping and rebuilt
+  client-side in `bootDB` (see `REBUILD_INDEX_SQL`-equivalent block there) — cuts the
+  download by ~35% at the cost of a sub-second `CREATE INDEX` pass after load.
 - `.nojekyll` — tells GitHub Pages to skip Jekyll processing
 
 `sql.js` (JS + `.wasm`) is loaded from cdnjs at runtime, so it is not committed.

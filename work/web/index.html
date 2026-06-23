@@ -431,7 +431,7 @@ syncPalBtns();
     const SQL=await initSqlJs({locateFile:f=>`https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/${f}`});
     // Cache-bust on schema change: bump DB_SCHEMA_VER whenever the web DB columns/tables
     // change, so returning visitors re-download instead of running new SQL on an old DB.
-    const DB_SCHEMA_VER='2026-06-23-abbrev-kp';
+    const DB_SCHEMA_VER='2026-06-23-noidx';
     const resp=await fetch('tennos-web.db.gz?v='+DB_SCHEMA_VER);
     if(!resp.ok) throw new Error('db indirilemedi');
     let buf;
@@ -444,6 +444,23 @@ syncPalBtns();
       buf=await ungzip(resp);
     }
     DB=new SQL.Database(new Uint8Array(buf));
+    // build_web_db.py strips these from the shipped .db to cut download size (~35%
+    // smaller); rebuild them here so query performance matches the server-side DB.
+    // Keep this list in sync with build_web_db.py's index drop.
+    DB.exec(`
+      CREATE INDEX IF NOT EXISTS idx_kp_player ON klasman_puan(player_id);
+      CREATE INDEX IF NOT EXISTS idx_kp_week ON klasman_puan(year, week, type, gender);
+      CREATE INDEX IF NOT EXISTS idx_match_tournament ON matches(tournament_id);
+      CREATE INDEX IF NOT EXISTS idx_match_event ON matches(age_group, gender);
+      CREATE INDEX IF NOT EXISTS idx_match_winner ON matches(winner_id);
+      CREATE INDEX IF NOT EXISTS idx_match_loser ON matches(loser_id);
+      CREATE INDEX IF NOT EXISTS idx_sets_match ON sets(match_id);
+      CREATE INDEX IF NOT EXISTS idx_players_club ON players(club_id);
+      CREATE INDEX IF NOT EXISTS idx_ratings_cat ON player_ratings(gender, age_group, age_group_rank);
+      CREATE INDEX IF NOT EXISTS idx_ratings_gender ON player_ratings(gender, gender_rank);
+      CREATE INDEX IF NOT EXISTS idx_ratings_rating ON player_ratings(rating DESC);
+      CREATE INDEX IF NOT EXISTS idx_rh_player ON player_rating_history(player_id);
+    `);
   };
   async function ungzip(resp,pre){
     const stream=(pre?new Response(pre):resp).body.pipeThrough(new DecompressionStream('gzip'));
