@@ -2427,7 +2427,7 @@ async function renderSlot(slot,id){
   let t; inp.oninput=()=>{clearTimeout(t);const v=inp.value.trim();
     if(v.length<2){res.classList.remove('show');return;}
     t=setTimeout(async()=>{const d=await api('/search'+qs({q:v}));
-      res.innerHTML=d.players.length?d.players.map(p=>`<div class="r" data-id="${p.player_id}"><span>${esc(p.name)}${p.club_abbrev?` <span class="muted">(${esc(p.club_abbrev)})</span>`:''}</span><span class="muted">${p.age_group?p.age_group+'Y ':''}${Math.round(p.rating)}</span></div>`).join(''):'<div class="r muted">sonuç yok</div>';
+      res.innerHTML=d.players.length?d.players.map(p=>{const abv=p.club_abbrev||((!p.club_name||p.club_name==='FERDI')?'FERDI':'');return `<div class="r" data-id="${p.player_id}"><span>${esc(p.name)}${abv?` <span class="muted">(${esc(abv)})</span>`:''}</span><span class="muted">${p.age_group?p.age_group+'Y ':''}${Math.round(p.rating)}</span></div>`;}).join(''):'<div class="r muted">sonuç yok</div>';
       res.classList.add('show');
       res.querySelectorAll('.r[data-id]').forEach(r2=>r2.onclick=()=>setSlot(slot,r2.dataset.id));
     },200);};
