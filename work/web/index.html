@@ -47,7 +47,7 @@
     --bg:#eaf2f7; --bg2:#dbeaf2; --panel:#f8fcfe; --panel2:#e8f3f9;
     --line:#d2e4ef; --line2:#bad4e3;
     --txt:#0f1c24; --txt2:#3a4d59; --dim:#6f8492;
-    --accent:#0089cf; --accent-ink:#0070ad; --accent-soft:#d8eefa; --score-ink:#22a5e6;
+    --accent:#1ea7e8; --accent-ink:#1487c4; --accent-soft:#e2f3fc; --score-ink:#3db8ee;
     --accent2:#e0922a; --accent2-soft:#f7ecda;
     --win:#1f9a6a; --win-soft:#ddf0e7; --loss:#d2452f; --loss-soft:#f8e4df; --gold:#b07d12;
   }
@@ -84,7 +84,7 @@
     --bg:#0a141b; --bg2:#0f1b24; --panel:#111e28; --panel2:#192836;
     --line:#243646; --line2:#314558;
     --txt:#e6eef4; --txt2:#bac8d4; --dim:#7c8d9b;
-    --accent:#22a5e6; --accent-ink:#22a5e6; --accent-soft:#0c2733; --score-ink:#3ab4f0;
+    --accent:#3db8ee; --accent-ink:#3db8ee; --accent-soft:#0c2733; --score-ink:#5cc6f2;
     --accent2:#e0a93a; --accent2-soft:#2a2110;
     --win:#46c98e; --win-soft:#0f2820; --loss:#ec6f53; --loss-soft:#2e1a14; --gold:#d8b24a;
   }
@@ -363,10 +363,10 @@
     </nav>
     <div class="side-foot">
       <div class="pal-row" id="palRow">
+        <button class="pal-btn" type="button" data-pal="ausopen" onclick="setPalette('ausopen')"><span class="dot" style="background:#1ea7e8"></span>AO</button>
         <button class="pal-btn" type="button" data-pal="clay" onclick="setPalette('clay')"><span class="dot" style="background:#b9542a"></span>Toprak</button>
         <button class="pal-btn" type="button" data-pal="grass" onclick="setPalette('grass')"><span class="dot" style="background:#1f8a3b"></span>Çim</button>
         <button class="pal-btn" type="button" data-pal="hard" onclick="setPalette('hard')"><span class="dot" style="background:#2f6fd0"></span>Sert</button>
-        <button class="pal-btn" type="button" data-pal="ausopen" onclick="setPalette('ausopen')"><span class="dot" style="background:#0089cf"></span>AO</button>
       </div>
       <button class="theme-btn" type="button" onclick="toggleTheme()"><span id="themeIcon">☾</span> <span id="themeLbl">Koyu tema</span></button>
       <div class="side-cred">İ-KORT 8–14 yaş turnuva verisi · Elo reyting · head-to-head</div>
@@ -382,10 +382,10 @@
       <button class="search-toggle" type="button" onclick="openMobileSearch()" aria-label="Ara">🔍</button>
       <button class="pal-cycle" type="button" id="palCycle" onclick="cyclePalette()" aria-label="Zemin rengini değiştir"><span class="dot"></span></button>
       <div class="pal-seg" id="palSeg">
+        <button type="button" data-pal="ausopen" onclick="setPalette('ausopen')" title="AO"><span class="dot" style="background:#1ea7e8"></span></button>
         <button type="button" data-pal="clay" onclick="setPalette('clay')" title="Toprak"><span class="dot" style="background:#b9542a"></span></button>
         <button type="button" data-pal="grass" onclick="setPalette('grass')" title="Çim"><span class="dot" style="background:#1f8a3b"></span></button>
         <button type="button" data-pal="hard" onclick="setPalette('hard')" title="Sert"><span class="dot" style="background:#2f6fd0"></span></button>
-        <button type="button" data-pal="ausopen" onclick="setPalette('ausopen')" title="AO"><span class="dot" style="background:#0089cf"></span></button>
       </div>
       <button class="theme-btn theme-btn--mobile" type="button" onclick="toggleTheme()" aria-label="Tema değiştir"><span id="themeIcon2">☾</span></button>
     </header>
@@ -396,7 +396,7 @@
 <script>
 function toggleTheme(){var dark=document.documentElement.getAttribute('data-theme')==='dark';var n=dark?'light':'dark';document.documentElement.setAttribute('data-theme',n);try{localStorage.setItem('tennos-theme',n);}catch(e){}syncThemeBtn();}
 function syncThemeBtn(){var dark=document.documentElement.getAttribute('data-theme')==='dark';var lbl=document.getElementById('themeLbl');if(lbl)lbl.textContent=dark?'Açık tema':'Koyu tema';['themeIcon','themeIcon2'].forEach(function(id){var e=document.getElementById(id);if(e)e.textContent=dark?'☀':'☾';});}
-var PAL_ORDER=['clay','grass','hard','ausopen'];
+var PAL_ORDER=['ausopen','clay','grass','hard'];
 // The four palettes are the four Grand Slams, labelled by host city (two are hard
 // court so surface names would clash). Stylized emblems, NOT the official logos:
 // clay -> Roland-Garros (tennis ball), grass -> Wimbledon (crossed rackets),
@@ -406,7 +406,7 @@ var PAL_META={
   clay:{name:'Roland-Garros',city:'Paris',emb:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#c2592c"/><path d="M4.6 7.4C8.2 9.4 8.2 14.6 4.6 16.6" fill="none" stroke="#fbe9df" stroke-width="1.7" stroke-linecap="round"/><path d="M19.4 7.4C15.8 9.4 15.8 14.6 19.4 16.6" fill="none" stroke="#fbe9df" stroke-width="1.7" stroke-linecap="round"/></svg>'},
   grass:{name:'Wimbledon',city:'Londra',emb:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#1f8a3b"/><g fill="none" stroke="#eafaee" stroke-width="1.5" stroke-linecap="round"><ellipse cx="9.2" cy="10" rx="2.6" ry="3.2" transform="rotate(-28 9.2 10)"/><ellipse cx="14.8" cy="10" rx="2.6" ry="3.2" transform="rotate(28 14.8 10)"/><path d="M10.5 13.2 8 17.6"/><path d="M13.5 13.2 16 17.6"/></g></svg>'},
   hard:{name:'US Open',city:'New York',emb:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#2f6fd0"/><path d="M8.5 16.5c-1.4-2.8.2-5.2 2.4-6.3 2.1-1.1 1.7-3 .7-4.2 3.2.9 5.4 3.7 4.3 6.8-.9 2.5-3.6 3.8-6 3" fill="none" stroke="#e6f0fd" stroke-width="1.7" stroke-linecap="round"/></svg>'},
-  ausopen:{name:'Australian Open',city:'Melbourne',emb:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#0089cf"/><text x="12" y="15.6" text-anchor="middle" font-family="Archivo,system-ui,sans-serif" font-size="9.5" font-weight="800" fill="#fff">AO</text></svg>'},
+  ausopen:{name:'Australian Open',city:'Melbourne',emb:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#1ea7e8"/><text x="12" y="15.6" text-anchor="middle" font-family="Archivo,system-ui,sans-serif" font-size="9.5" font-weight="800" fill="#fff">AO</text></svg>'},
 };
 function setPalette(p){document.documentElement.setAttribute('data-palette',p);try{localStorage.setItem('tennos-palette',p);}catch(e){}syncPalBtns();}
 function cyclePalette(){var cur=document.documentElement.getAttribute('data-palette')||'clay';setPalette(PAL_ORDER[(PAL_ORDER.indexOf(cur)+1)%PAL_ORDER.length]);}
