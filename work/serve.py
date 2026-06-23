@@ -260,16 +260,16 @@ class Handler(BaseHTTPRequestHandler):
             "topCategory": f"{top_cat['age_group']} Yaş {top_cat['gender']}" if top_cat else "—",
         }
         records = {
-            "peak": one(f"SELECT player_id,name,round(peak_rating) v FROM player_ratings WHERE {af()} ORDER BY peak_rating DESC LIMIT 1"),
-            "mostMatches": one(f"SELECT player_id,name,matches v FROM player_ratings WHERE {af()} ORDER BY matches DESC LIMIT 1"),
-            "youngest": one(f"SELECT player_id,name,birth_year v,round(rating) rating FROM player_ratings WHERE matches>=5 AND birth_year IS NOT NULL AND {af()} ORDER BY birth_year DESC,rating DESC LIMIT 1"),
-            "bestPct": one(f"SELECT player_id,name,wins,losses,round(wins*100.0/matches) v FROM player_ratings WHERE matches>=30 AND {af()} ORDER BY wins*1.0/matches DESC LIMIT 1"),
+            "peak": one("SELECT player_id,name,round(peak_rating) v FROM player_ratings ORDER BY peak_rating DESC LIMIT 1"),
+            "mostMatches": one("SELECT player_id,name,matches v FROM player_ratings ORDER BY matches DESC LIMIT 1"),
+            "youngest": one("SELECT player_id,name,birth_year v,round(rating) rating FROM player_ratings WHERE matches>=5 AND birth_year IS NOT NULL ORDER BY birth_year DESC,rating DESC LIMIT 1"),
+            "bestPct": one("SELECT player_id,name,wins,losses,round(wins*100.0/matches) v FROM player_ratings WHERE matches>=30 ORDER BY wins*1.0/matches DESC LIMIT 1"),
             "mostTournaments": one(
-                f"""WITH pt AS (SELECT player_id,count(DISTINCT tournament_id) v FROM (
+                """WITH pt AS (SELECT player_id,count(DISTINCT tournament_id) v FROM (
                         SELECT winner_id player_id,tournament_id FROM matches WHERE winner_id IS NOT NULL AND tournament_id IS NOT NULL
                         UNION ALL SELECT loser_id player_id,tournament_id FROM matches WHERE loser_id IS NOT NULL AND tournament_id IS NOT NULL
                     ) GROUP BY player_id)
-                    SELECT pr.player_id,pr.name,pt.v FROM player_ratings pr JOIN pt ON pt.player_id=pr.player_id WHERE {af('pr.')} ORDER BY pt.v DESC LIMIT 1"""
+                    SELECT pr.player_id,pr.name,pt.v FROM player_ratings pr JOIN pt ON pt.player_id=pr.player_id ORDER BY pt.v DESC LIMIT 1"""
             ),
         }
         rise = one(
@@ -277,7 +277,7 @@ class Handler(BaseHTTPRequestHandler):
                     FROM player_rating_history WHERE SUBSTR(match_date,7,4)||SUBSTR(match_date,4,2)||SUBSTR(match_date,1,2)>='{acs}'),
                 strt AS (SELECT player_id,count(*) c,MIN(dk) mindk FROM h GROUP BY player_id)
                 SELECT pr.player_id,pr.name,CAST(round(pr.rating-(SELECT rating_after FROM h WHERE h.player_id=strt.player_id AND h.dk=strt.mindk LIMIT 1)) AS INTEGER) v
-                FROM strt JOIN player_ratings pr ON pr.player_id=strt.player_id WHERE strt.c>=5 AND {af('pr.')} ORDER BY v DESC LIMIT 1"""
+                FROM strt JOIN player_ratings pr ON pr.player_id=strt.player_id WHERE strt.c>=5 ORDER BY v DESC LIMIT 1"""
         )
         if rise and rise.get("v") is not None:
             rise["v"] = (f"+{rise['v']}" if rise["v"] > 0 else str(rise["v"]))
