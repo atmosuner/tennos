@@ -98,6 +98,9 @@ rebuilds are idempotent.
 vanilla JS, hash routing). Endpoints: `/api/stats`, `/api/rankings`, `/api/player/{id}`,
 `/api/h2h/{a}/{b}`, `/api/common/{a}/{b}`, `/api/players`, `/api/tournaments`,
 `/api/tournament/{id}`, `/api/clubs`, `/api/search`. Opens DB read-only. Port 8001.
+Static files under `work/web/` are served by `send_file`, which sets MIME from a small
+extension map (`.html/.js/.css/.svg/.png/.json`) — anything else is `octet-stream`, so a
+new static asset type that must render in-browser (e.g. `.svg`) needs adding there.
 
 **`index.html` always uses `dbApi` (in-browser sql.js against `tennos-web.db.gz`).** The
 `serve.py` JSON API endpoints exist for direct testing (curl etc.) but the UI never hits
@@ -111,6 +114,21 @@ refresh the browser DB.
 DB shape changes (new column/table), **bump `DB_SCHEMA_VER`** in that fetch — otherwise
 returning visitors run the new SQL against a browser-cached old DB and get
 `no such column ...`. Data-only refreshes (no schema change) don't need a bump.
+
+**Theming / palettes:** light + dark theme × four palettes, one per Grand Slam court
+surface — `ausopen` (cyan), `clay` (Roland-Garros), `grass` (Wimbledon), `hard`
+(US Open). Each is a `[data-palette=...]` CSS-var block (and a `[data-theme="dark"]...`
+variant); both attributes are set on `<html>` from `localStorage` before first paint.
+`PAL_ORDER` (cycle order) and `PAL_META` (slam name, host-city label, logo `<img>`) live
+in the head `<script>`. Palettes are labelled by **host city** (Paris/Londra/New York/
+Melbourne) since two are hard court. Controls: 4-swatch row in the sidebar + topbar
+(desktop), single tap-to-cycle button on mobile (`cyclePalette`). Emblems are the real
+tournament logos in `work/web/logos/*.svg` on a white chip — trademarked, kept at the
+owner's request.
+
+Player search (`/search` + `dbApi.search`) joins `clubs` for `club_abbrev`; the compare
+picker shows it in parens after the name, falling back to `(FERDI)` when the player has
+no club.
 
 Score rendering: `sets.p1/p2` follow the match's player order, not winner-first. `matches`
 stores `p1_id`/`p2_id`; `build_score` orients the score by whether the viewer is `p1_id`
