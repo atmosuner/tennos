@@ -749,7 +749,7 @@ syncPalBtns();
     search(q){
       const t=(q.q||'').trim(); if(t.length<2) return {players:[],clubs:[]};
       const like='%'+fold(t)+'%';
-      return {players:Q('SELECT player_id,name,age_group,rating,club_name FROM player_ratings WHERE '+foldsql('name')+' LIKE ? ORDER BY rating DESC LIMIT 15',[like]),
+      return {players:Q('SELECT pr.player_id,pr.name,pr.age_group,pr.rating,pr.club_name,cl.abbrev club_abbrev FROM player_ratings pr LEFT JOIN clubs cl ON cl.club_id=pr.club_id WHERE '+foldsql('pr.name')+' LIKE ? ORDER BY pr.rating DESC LIMIT 15',[like]),
         clubs:Q('SELECT club_id,name,city FROM clubs WHERE '+foldsql('name')+' LIKE ? LIMIT 10',[like])};
     },
     club_opponents(q){
@@ -2427,7 +2427,7 @@ async function renderSlot(slot,id){
   let t; inp.oninput=()=>{clearTimeout(t);const v=inp.value.trim();
     if(v.length<2){res.classList.remove('show');return;}
     t=setTimeout(async()=>{const d=await api('/search'+qs({q:v}));
-      res.innerHTML=d.players.length?d.players.map(p=>`<div class="r" data-id="${p.player_id}"><span>${esc(p.name)}</span><span class="muted">${p.age_group?p.age_group+'Y ':''}${Math.round(p.rating)}</span></div>`).join(''):'<div class="r muted">sonuç yok</div>';
+      res.innerHTML=d.players.length?d.players.map(p=>`<div class="r" data-id="${p.player_id}"><span>${esc(p.name)}${p.club_abbrev?` <span class="muted">(${esc(p.club_abbrev)})</span>`:''}</span><span class="muted">${p.age_group?p.age_group+'Y ':''}${Math.round(p.rating)}</span></div>`).join(''):'<div class="r muted">sonuç yok</div>';
       res.classList.add('show');
       res.querySelectorAll('.r[data-id]').forEach(r2=>r2.onclick=()=>setSlot(slot,r2.dataset.id));
     },200);};

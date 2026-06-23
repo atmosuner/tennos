@@ -859,8 +859,9 @@ class Handler(BaseHTTPRequestHandler):
             return {"players": [], "clubs": []}
         like = f"%{fold(term)}%"
         players = rows_to_dicts(conn.execute(
-            f"""SELECT pr.player_id, pr.name, pr.age_group, pr.rating, pr.club_name
-               FROM player_ratings pr WHERE {foldsql('pr.name')} LIKE ? ORDER BY pr.rating DESC LIMIT 15""",
+            f"""SELECT pr.player_id, pr.name, pr.age_group, pr.rating, pr.club_name, cl.abbrev AS club_abbrev
+               FROM player_ratings pr LEFT JOIN clubs cl ON cl.club_id=pr.club_id
+               WHERE {foldsql('pr.name')} LIKE ? ORDER BY pr.rating DESC LIMIT 15""",
             (like,),
         ).fetchall())
         clubs = rows_to_dicts(conn.execute(
