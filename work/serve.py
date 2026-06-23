@@ -167,6 +167,9 @@ class Handler(BaseHTTPRequestHandler):
             ".html": "text/html; charset=utf-8",
             ".js": "application/javascript; charset=utf-8",
             ".css": "text/css; charset=utf-8",
+            ".svg": "image/svg+xml",
+            ".png": "image/png",
+            ".json": "application/json; charset=utf-8",
         }.get(path.suffix, "application/octet-stream")
         body = path.read_bytes()
         self.send_response(200)
