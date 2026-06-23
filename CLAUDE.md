@@ -17,9 +17,18 @@ python3 work/scrape_tournament_details.py    # -> outputs/tournament_details/{id
 python3 work/scrape_clubs.py                 # -> outputs/clubs.json + club_abbrev_map.json
 python3 work/resolve_clubs.py                # match "(ABBREV)" -> club via player profiles -> player_club_overrides.json
 python3 work/scrape_players.py               # player directory by birth year -> outputs/players.json (~31k players)
+python3 work/scrape_klasman_puan.py          # İ-KORT klasman puanı history -> klasman_puan table
 python3 work/build_db.py                     # all JSON -> outputs/tennos.db (SQLite)
 python3 work/build_ratings.py                # Elo -> player_ratings table in tennos.db
 python3 work/serve.py                        # web app at http://localhost:8001
+```
+
+`scrape_players.py` only covers birth years ~2008–2018. For players whose last match
+predates that window, run the one-time backfill to fill `birth_year`/`gender` from each
+profile page (idempotent — only touches rows where `gender IS NULL`):
+
+```bash
+python3 work/backfill_legacy_player_profiles.py   # --dry-run / --workers N / --limit N
 ```
 
 After the scraper adds new tournaments, re-run `resolve_clubs.py` (incremental — only
@@ -66,6 +75,20 @@ have played in; rankings give `overall_rank`, `age_group_rank`, and `gender_rank
 When the rankings API is called with `age_group` filter, `wins`/`losses` are computed
 from matches in that age group only (not career totals).
 
+**Rankings list (`/api/rankings`) is driven from the `players` table**, LEFT JOINing
+`player_ratings` — so unrated players (no Elo yet) still appear, sorted last. Filters
+(`club_id`, `gender`, `birth_year`, `city`, `q`) hit `players` columns, not `pr.*`.
+`active_only` is **opt-in** (last 6 months); default shows everyone. Each row also carries
+`club_abbrev` (from `clubs.abbrev`) and `kp` (latest İ-KORT klasman puanı).
+
+**`clubs.abbrev`** (populated by `build_db.py::populate_club_abbrev`): trusted unique
+abbrev from `club_abbrev_map.json` first, else the most common non-FERDI abbrev seen in
+that club's match data. Used as the inline club tag in rankings.
+
+**klasman puanı** (`scrape_klasman_puan.py` → `klasman_puan` table): official İ-KORT
+ranking points, keyed by `player_id, year, week, type`. Rankings show the latest value;
+player profiles chart the history.
+
 **match_id** is `md5(tournament|dayId|court|matchCode|rawText)[:16]` — deterministic, so
 rebuilds are idempotent.
 
@@ -87,6 +110,12 @@ refresh the browser DB.
 Score rendering: `sets.p1/p2` follow the match's player order, not winner-first. `matches`
 stores `p1_id`/`p2_id`; `build_score` orients the score by whether the viewer is `p1_id`
 (passing `won` instead is the classic bug — it reverses scores for losers shown as p1).
+`build_set_score` gives the winner-perspective set count ("2-1") used in compare/h2h.
+
+Tournament detail (`/api/tournament/{id}`) reports per-event `championId`/`championName`
+**and** `finalistId`/`finalistName` (champion = winner of a `%Final%` match, finalist =
+its loser). Each match also carries `winnerRating`/`loserRating` — each player's Elo
+*as of just before that match* (from `player_rating_history`), not their current rating.
 
 ## Data shapes
 

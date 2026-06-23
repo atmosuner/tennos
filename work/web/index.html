@@ -183,9 +183,7 @@
   tbody tr:hover td{background:var(--panel2)}
   .rank{font-family:var(--font-mono);font-weight:700;color:var(--dim);width:46px;
     font-variant-numeric:tabular-nums;font-size:15px}
-  .rank.top{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:26px;
-    padding:0 7px;border-radius:8px;background:var(--gold);color:#fff;font-size:13px}
-  [data-theme="dark"] .rank.top{color:#1b1e16}
+  .rank.top{color:var(--gold)}
   .rating{font-family:var(--font-mono);font-weight:700;color:var(--accent-ink);font-variant-numeric:tabular-nums;
     font-size:16px;letter-spacing:-.01em}
 
@@ -193,6 +191,8 @@
   .pill{display:inline-flex;align-items:center;padding:3px 9px;border-radius:8px;font-size:11.5px;font-weight:700;
     background:var(--panel2);border:1px solid var(--line);color:var(--txt2);letter-spacing:.01em;line-height:1.4;white-space:nowrap}
   .pill.age{color:var(--accent2);background:var(--accent2-soft);border-color:transparent}
+  .rk-club-inline,.rk-cat-inline,.rk-pct-inline{display:none}
+  .sup-init{display:none}
   a.pill.age:hover{color:var(--accent2)}
   .w{color:var(--win);font-weight:700} .l{color:var(--loss);font-weight:700}
   .badge{font-size:11px;padding:3px 8px;border-radius:7px;font-weight:800;letter-spacing:.02em}
@@ -242,6 +242,9 @@
   .picked .x{margin-left:auto;color:var(--dim);cursor:pointer;font-weight:700;padding:0 4px}
   .picked .x:hover{color:var(--loss)}
   .cmp{display:grid;grid-template-columns:60px 1fr 60px;gap:4px 12px;align-items:center;margin-bottom:18px}
+  .cmp-grp{margin-bottom:20px}
+  .cmp-row{margin-bottom:0;padding:11px 0;border-bottom:1px solid var(--line)}
+  .cmp-row:last-of-type{border-bottom:none}
   .cmp .lbl{grid-column:1/4;text-align:center;font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.07em;font-weight:600}
   .cmp .va{grid-column:1;text-align:right;font-family:var(--font-mono);font-weight:700;font-size:19px;font-variant-numeric:tabular-nums}
   .cmp .vb{grid-column:3;text-align:left;font-family:var(--font-mono);font-weight:700;font-size:19px;font-variant-numeric:tabular-nums}
@@ -289,7 +292,7 @@
     .search.open{display:block;position:absolute;left:10px;right:10px;top:8px;width:auto;margin:0;max-width:none;z-index:45}
     .search-toggle{display:inline-flex;align-items:center;justify-content:center;min-width:42px;height:38px;margin-left:auto;
       background:var(--panel2);border:1px solid var(--line);color:var(--txt2);border-radius:10px;cursor:pointer;font-size:16px}
-    .club-grid{grid-template-columns:1fr!important}
+    .club-grid{grid-template-columns:minmax(0,1fr)!important}
     .rec-grid{grid-template-columns:repeat(2,1fr)!important}
     main{padding:22px 16px 96px}
     h1{font-size:25px} h2{font-size:16px;margin:26px 0 12px}
@@ -303,7 +306,15 @@
     .profile-score{width:100%;text-align:left;background:var(--panel);border:1px solid var(--line)}
     .kl-club,.kl-type{display:none!important}
     .ml-stage,.ml-viewer,.ml-vs,.ml-h2h,.hide-mobile{display:none!important}
-    .rk-cmp,.rk-cat,.rk-wl,.rk-club{display:none!important}
+    .rk-cmp,.rk-wl,.rk-club,.rk-dob,.rk-pct{display:none!important}
+    table th:first-child,table td.rank{padding-left:8px;padding-right:4px}
+    .rank{font-size:12px}
+    #rk table{font-size:13.5px}
+    .rk-name{display:flex;flex-direction:column;gap:0;line-height:1.3}
+    .rk-name2{font-size:.85em;color:var(--txt2);font-weight:400}
+    .rk-club-inline,.rk-cat-inline,.rk-pct-inline{display:block!important;font-size:.78em}
+    .sup-nm{display:none}
+    .sup-init{display:inline}
     table{white-space:normal}
     .matchline{flex-wrap:wrap;gap:6px 10px}
     .matchline>span[style*="margin-left:auto"],.matchline>span[style*="margin-left: auto"]{margin-left:0!important;text-align:left!important;flex-basis:100%}
@@ -321,8 +332,7 @@
     <a class="brand" href="#/"><svg class="logo-mark" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M13 2L23 7.5V18.5L13 24L3 18.5V7.5Z" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.6" stroke-linejoin="round"/><line x1="3" y1="13" x2="23" y2="13" stroke="var(--accent)" stroke-width="1.1" opacity=".6"/><path d="M9 8.5v9M9 13l5-4.5M9 13l5 4.5" stroke="var(--accent-ink)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Kort<span class="ex">ex</span></span></a>
     <nav id="nav">
       <a href="#/">Özet</a>
-      <a href="#/rankings">Sıralama</a>
-      <a href="#/players">Oyuncular</a>
+      <a href="#/rankings">Oyuncular</a>
       <a href="#/tournaments">Turnuvalar</a>
       <a href="#/clubs">Kulüpler</a>
       <a href="#/compare">Karşılaştır</a>
@@ -476,7 +486,7 @@ syncPalBtns();
       const byAgeGender=Q(`SELECT age_group,gender,count(*) n FROM player_ratings WHERE age_group IS NOT NULL AND gender IS NOT NULL AND ${af} GROUP BY age_group,gender ORDER BY age_group,gender`)
         .map(c=>({...c,top3:Q(`SELECT player_id,name,rating,club_name FROM player_ratings WHERE age_group=? AND gender=? AND ${af} ORDER BY rating DESC LIMIT 3`,[c.age_group,c.gender])}));
       return {players:scalar('SELECT count(*) FROM players'),ratedPlayers:scalar('SELECT count(*) FROM player_ratings'),
-        activeRatedPlayers:scalar(`SELECT count(*) FROM player_ratings WHERE ${af}`),
+        activeRatedPlayers:scalar(`SELECT count(*) FROM player_ratings`),
         clubs:scalar('SELECT count(*) FROM clubs'),tournaments:scalar('SELECT count(*) FROM tournaments'),
         matches:scalar('SELECT count(*) FROM matches'),completed:scalar("SELECT count(*) FROM matches WHERE result_type='completed'"),
         byAgeGender};
@@ -503,7 +513,7 @@ syncPalBtns();
         bestPct:one(`SELECT player_id,name,wins,losses,round(wins*100.0/matches) v FROM player_ratings WHERE matches>=30 ORDER BY wins*1.0/matches DESC LIMIT 1`),
         mostTournaments:one(`WITH pt AS (SELECT player_id,count(DISTINCT tournament_id) v FROM (SELECT winner_id player_id,tournament_id FROM matches WHERE winner_id IS NOT NULL AND tournament_id IS NOT NULL UNION ALL SELECT loser_id player_id,tournament_id FROM matches WHERE loser_id IS NOT NULL AND tournament_id IS NOT NULL) GROUP BY player_id)
           SELECT pr.player_id,pr.name,pt.v FROM player_ratings pr JOIN pt ON pt.player_id=pr.player_id ORDER BY pt.v DESC LIMIT 1`),
-        biggestRise:(()=>{const r=one(`WITH h AS (SELECT player_id,rating_after,SUBSTR(match_date,7,4)||SUBSTR(match_date,4,2)||SUBSTR(match_date,1,2) dk FROM player_rating_history WHERE SUBSTR(match_date,7,4)||SUBSTR(match_date,4,2)||SUBSTR(match_date,1,2)>='${acs}'),
+        biggestRise:(()=>{const r=one(`WITH h AS (SELECT player_id,rating_after,SUBSTR(match_date,7,4)||SUBSTR(match_date,4,2)||SUBSTR(match_date,1,2) dk FROM player_rating_history),
           strt AS (SELECT player_id,count(*) c,MIN(dk) mindk FROM h GROUP BY player_id)
           SELECT pr.player_id,pr.name,CAST(round(pr.rating-(SELECT rating_after FROM h WHERE h.player_id=strt.player_id AND h.dk=strt.mindk LIMIT 1)) AS INTEGER) v
           FROM strt JOIN player_ratings pr ON pr.player_id=strt.player_id WHERE strt.c>=5 ORDER BY v DESC LIMIT 1`);
@@ -516,28 +526,34 @@ syncPalBtns();
         WHERE m.result_type='completed' AND wr.matches>=10 AND lr.matches>=10 AND ${af('wr.')} AND ${af('lr.')} AND lr.rating-wr.rating>0
         ORDER BY gap DESC LIMIT 6`);
       const cohorts=Q(`SELECT birth_year,round(avg(rating)) avg,count(*) n FROM player_ratings WHERE birth_year IS NOT NULL AND matches>=5 AND ${af()} GROUP BY birth_year HAVING n>=20 ORDER BY birth_year DESC LIMIT 8`);
-      const cities=Q(`SELECT p.city,count(*) n FROM player_ratings pr JOIN players p ON p.player_id=pr.player_id WHERE p.city<>'' AND p.city IS NOT NULL AND ${af('pr.')} GROUP BY p.city ORDER BY n DESC LIMIT 10`);
+      const cities=Q(`SELECT p.city,count(*) n FROM player_ratings pr JOIN players p ON p.player_id=pr.player_id WHERE p.city<>'' AND p.city IS NOT NULL GROUP BY p.city ORDER BY n DESC LIMIT 10`);
       return {season,records,topClubs,youngTalents,upsets,cohorts,cities};
     },
     rankings(q){
       const w=['1=1'],p=[];
       if(q.age_group){w.push('pr.age_group=?');p.push(+q.age_group);}
-      if(q.club_id){w.push('pr.club_id=?');p.push(+q.club_id);}
-      if(q.gender){w.push('pr.gender=?');p.push(q.gender);}
-      if(q.birth_year){w.push('pr.birth_year=?');p.push(+q.birth_year);}
-      if(q.q){w.push(foldsql('pr.name')+' LIKE ?');p.push('%'+fold(q.q)+'%');}
-      if(!q.all_time){const c=new Date();c.setMonth(c.getMonth()-6);const cs=c.getFullYear()+String(c.getMonth()+1).padStart(2,'0')+String(c.getDate()).padStart(2,'0');w.push(`SUBSTR(pr.last_match_date,7,4)||SUBSTR(pr.last_match_date,4,2)||SUBSTR(pr.last_match_date,1,2)>='${cs}'`);}
+      if(q.club_id){w.push('p.club_id=?');p.push(+q.club_id);}
+      if(q.gender){w.push('p.gender=?');p.push(q.gender);}
+      if(q.birth_year){w.push('p.birth_year=?');p.push(+q.birth_year);}
+      if(q.city){w.push('p.city=?');p.push(q.city);}
+      if(q.q){w.push(foldsql('p.name')+' LIKE ?');p.push('%'+fold(q.q)+'%');}
+      if(q.active_only){const c=new Date();c.setMonth(c.getMonth()-6);const cs=c.getFullYear()+String(c.getMonth()+1).padStart(2,'0')+String(c.getDate()).padStart(2,'0');w.push(`SUBSTR(pr.last_match_date,7,4)||SUBSTR(pr.last_match_date,4,2)||SUBSTR(pr.last_match_date,1,2)>='${cs}'`);}
       if(q.min_matches!=null){w.push('pr.matches>=?');p.push(+q.min_matches);}
       const lim=Math.min(+(q.limit||50),500), off=+(q.offset||0);
       const ord=q.age_group?'pr.age_group_rank':(q.gender?'pr.gender_rank':'pr.overall_rank');
       const wc=w.join(' AND ');
       const agSel=q.age_group
-        ? `,(SELECT count(*) FROM matches WHERE winner_id=pr.player_id AND age_group=${+q.age_group} AND result_type='completed') ag_wins,(SELECT count(*) FROM matches WHERE loser_id=pr.player_id AND age_group=${+q.age_group} AND result_type='completed') ag_losses`
+        ? `,(SELECT count(*) FROM matches WHERE winner_id=p.player_id AND age_group=${+q.age_group} AND result_type='completed') ag_wins,(SELECT count(*) FROM matches WHERE loser_id=p.player_id AND age_group=${+q.age_group} AND result_type='completed') ag_losses`
         : '';
-      const rows=Q(`SELECT pr.*,p.gender pgender,p.city player_city,(SELECT puan FROM klasman_puan WHERE player_id=pr.player_id ORDER BY year DESC,week DESC,type DESC LIMIT 1) kp${agSel} FROM player_ratings pr LEFT JOIN players p ON p.player_id=pr.player_id WHERE ${wc} ORDER BY ${ord} LIMIT ? OFFSET ?`,[...p,lim,off]);
+      const rows=Q(`SELECT p.player_id,p.name,p.birth_year,p.gender,p.club_id,p.club_name,p.city player_city,cl.abbrev club_abbrev,
+          pr.rating,pr.peak_rating,pr.matches,pr.wins,pr.losses,pr.age_group,pr.first_match_date,pr.last_match_date,
+          pr.overall_rank,pr.gender_rank,pr.age_group_rank,
+          (SELECT puan FROM klasman_puan WHERE player_id=p.player_id ORDER BY year DESC,week DESC,type DESC LIMIT 1) kp${agSel}
+          FROM players p LEFT JOIN player_ratings pr ON pr.player_id=p.player_id
+          LEFT JOIN clubs cl ON cl.club_id=p.club_id WHERE ${wc} ORDER BY (${ord} IS NULL),${ord},p.name LIMIT ? OFFSET ?`,[...p,lim,off]);
       if(q.age_group) rows.forEach(r=>{r.wins=r.ag_wins;r.losses=r.ag_losses;});
-      const total=scalar(`SELECT count(*) FROM player_ratings pr LEFT JOIN players p ON p.player_id=pr.player_id WHERE ${wc}`,p);
-      const years=Q('SELECT DISTINCT birth_year FROM player_ratings WHERE birth_year IS NOT NULL ORDER BY birth_year').map(r=>r.birth_year);
+      const total=scalar(`SELECT count(*) FROM players p LEFT JOIN player_ratings pr ON pr.player_id=p.player_id WHERE ${wc}`,p);
+      const years=Q('SELECT DISTINCT birth_year FROM players WHERE birth_year IS NOT NULL ORDER BY birth_year').map(r=>r.birth_year);
       return {total,limit:lim,offset:off,years,rankings:rows};
     },
     player(id){
@@ -554,13 +570,13 @@ syncPalBtns();
       return {player:base,rating,recentMatches:matches,totalMatches:matches.length,stageRecord:stages,topOpponents:top,ratingHistory,klasmanHistory};
     },
     h2h(a,b){a=+a;b=+b;
-      const rows=Q(`SELECT m.match_id,m.match_date,m.event,m.stage,m.winner_id,m.loser_id,m.p1_id,m.tournament_id,t.name tname
+      const rows=Q(`SELECT m.match_id,m.match_date,m.event,m.stage,m.age_group,m.winner_id,m.loser_id,m.p1_id,m.tournament_id,t.name tname
         FROM matches m LEFT JOIN tournaments t ON t.tournament_id=m.tournament_id
         WHERE m.result_type='completed' AND ((m.winner_id=? AND m.loser_id=?) OR (m.winner_id=? AND m.loser_id=?))`,[a,b,b,a]);
       const wa=rows.filter(r=>r.winner_id===a).length;
       return {a:{playerId:a,name:nameOf(a),wins:wa},b:{playerId:b,name:nameOf(b),wins:rows.length-wa},total:rows.length,
-        matches:rows.map(r=>({date:r.match_date,event:r.event,stage:r.stage,winnerId:r.winner_id,aWon:r.winner_id===a,
-          tournamentId:r.tournament_id,tournamentName:r.tname,score:buildScore(r.match_id,r.p1_id===a)}))};
+        matches:rows.map(r=>({date:r.match_date,event:r.event,stage:r.stage,ageGroup:r.age_group,winnerId:r.winner_id,aWon:r.winner_id===a,
+          tournamentId:r.tournament_id,tournamentName:r.tname,score:buildScore(r.match_id,r.p1_id===a),sets:buildSetCols(r.match_id,r.p1_id===r.winner_id)}))};
     },
     common(a,b){a=+a;b=+b;
       const ra=oppRecord(a),rb=oppRecord(b);
@@ -601,35 +617,48 @@ syncPalBtns();
       if(q.age_group){w.push('EXISTS(SELECT 1 FROM matches mx WHERE mx.tournament_id=t.tournament_id AND mx.age_group=?)');p.push(+q.age_group);}
       const lim=Math.min(+(q.limit||700),700),wc=w.join(' AND ');
       const mcSql=`(SELECT count(*) FROM matches m WHERE m.tournament_id=t.tournament_id AND m.winner_id IS NOT NULL AND m.loser_id IS NOT NULL)`;
-      const rows=Q(`SELECT t.tournament_id,t.name,t.city,t.start_date,t.year,t.type_text,t.surface,t.court_type,t.source_tab,c.name club_name,
-        ${mcSql} match_count
+      const pcSql=`(SELECT count(*) FROM (SELECT winner_id v FROM matches WHERE tournament_id=t.tournament_id AND winner_id IS NOT NULL UNION SELECT loser_id FROM matches WHERE tournament_id=t.tournament_id AND loser_id IS NOT NULL))`;
+      const dord=`SUBSTR(REPLACE(t.start_date,' ',''),7,4)||SUBSTR(REPLACE(t.start_date,' ',''),4,2)||SUBSTR(REPLACE(t.start_date,' ',''),1,2)`;
+      const order=q.sort==='size'?`${mcSql} DESC, ${dord} DESC, t.tournament_id DESC`:`${dord} DESC, t.tournament_id DESC`;
+      const rows=Q(`SELECT t.tournament_id,t.name,t.title,t.city,t.start_date,t.year,t.type_text,t.surface,t.court_type,t.source_tab,c.name club_name,
+        ${mcSql} match_count, ${pcSql} player_count
         FROM tournaments t LEFT JOIN clubs c ON c.club_id=t.club_id WHERE ${wc} AND (${mcSql}>0 OR t.source_tab='guncel')
-        ORDER BY SUBSTR(REPLACE(t.start_date,' ',''),7,4)||SUBSTR(REPLACE(t.start_date,' ',''),4,2)||SUBSTR(REPLACE(t.start_date,' ',''),1,2) DESC,
-          t.tournament_id DESC LIMIT ?`,[...p,lim]);
+        ORDER BY ${order} LIMIT ?`,[...p,lim]);
       const years=Q('SELECT DISTINCT year FROM tournaments WHERE year IS NOT NULL ORDER BY year DESC').map(r=>r.year);
       const age_groups=Q('SELECT DISTINCT age_group FROM matches WHERE age_group IS NOT NULL ORDER BY age_group').map(r=>r.age_group);
-      return {total:rows.length,years,age_groups,tournaments:rows};
+      const cities=Q("SELECT DISTINCT city FROM tournaments WHERE city IS NOT NULL AND city<>'' ORDER BY city").map(r=>r.city);
+      return {total:rows.length,years,age_groups,cities,tournaments:rows};
     },
     tournament(id){id=+id;
       const t=one('SELECT * FROM tournaments WHERE tournament_id=?',[id]); if(!t) return {error:'tournament not found'};
       const club=t.club_id?one('SELECT name,city FROM clubs WHERE club_id=?',[t.club_id]):null;
       const cats=Q(`SELECT event,age_group,gender,count(*) n,sum(CASE WHEN result_type='completed' THEN 1 ELSE 0 END) completed
         FROM matches WHERE tournament_id=? AND event<>'' GROUP BY event ORDER BY n DESC`,[id]);
-      const champs={};
-      for(const r of Q("SELECT event,winner_id FROM matches WHERE tournament_id=? AND stage LIKE '%Final%' AND winner_id IS NOT NULL",[id])) if(!(r.event in champs)) champs[r.event]=r.winner_id;
-      const mrows=Q('SELECT match_id,event,stage,gender,day_name,match_date,court,start_time,match_code,winner_id,loser_id,p1_id FROM matches WHERE tournament_id=?',[id]);
+      const champs={},finals={};
+      for(const r of Q("SELECT event,winner_id,loser_id FROM matches WHERE tournament_id=? AND stage LIKE '%Final%' AND winner_id IS NOT NULL",[id])) if(!(r.event in champs)){champs[r.event]=r.winner_id;finals[r.event]=r.loser_id;}
+      const ratingAt=(pid,dk)=>{ if(pid==null||!dk) return null;
+        const r=one(`SELECT rating_after FROM player_rating_history WHERE player_id=? AND SUBSTR(match_date,7,4)||SUBSTR(match_date,4,2)||SUBSTR(match_date,1,2)<? ORDER BY SUBSTR(match_date,7,4)||SUBSTR(match_date,4,2)||SUBSTR(match_date,1,2) DESC, rowid DESC LIMIT 1`,[pid,dk]);
+        return r?Math.round(r.rating_after):null; };
+      const mrows=Q('SELECT match_id,event,stage,gender,day_name,match_date,court,start_time,match_code,result_type,winner_id,loser_id,p1_id FROM matches WHERE tournament_id=?',[id]);
       const matches=[];
       for(const r of mrows){ if(r.winner_id==null||r.loser_id==null) continue;
-        matches.push({event:r.event,stage:r.stage,gender:r.gender,dayName:r.day_name,date:r.match_date,court:r.court,startTime:r.start_time,matchCode:r.match_code,
+        const dk=r.match_date?r.match_date.slice(6,10)+r.match_date.slice(3,5)+r.match_date.slice(0,2):'';
+        matches.push({event:r.event,stage:r.stage,gender:r.gender,dayName:r.day_name,date:r.match_date,court:r.court,startTime:r.start_time,matchCode:r.match_code,resultType:r.result_type,
           winnerId:r.winner_id,winnerName:nameOf(r.winner_id),loserId:r.loser_id,loserName:nameOf(r.loser_id),
+          winnerRating:ratingAt(r.winner_id,dk),loserRating:ratingAt(r.loser_id,dk),
           score:buildScore(r.match_id,r.p1_id===r.winner_id),sets:buildSetCols(r.match_id,r.p1_id===r.winner_id)});}
-      for(const c of cats){const cid=champs[c.event];c.championId=cid||null;c.championName=cid?nameOf(cid):null;}
+      for(const c of cats){const cid=champs[c.event],fid=finals[c.event];c.championId=cid||null;c.championName=cid?nameOf(cid):null;c.finalistId=fid||null;c.finalistName=fid?nameOf(fid):null;}
       return {tournament:t,club,categories:cats,matches};
     },
     clubs(q){
       const w=['1=1'],p=[]; if(q.q){w.push(foldsql('c.name')+' LIKE ?');p.push('%'+fold(q.q)+'%');}
+      if(q.city){w.push('c.city=?');p.push(q.city);}
       const lim=Math.min(+(q.limit||100),600);
-      const rows=Q(`SELECT c.club_id,c.name,c.city,
+      const orderMap={elo:'pr.avg_rating IS NULL, pr.avg_rating DESC',
+        pct:'((coalesce(total_wins,0)+coalesce(total_losses,0))>=20) DESC, coalesce(total_wins,0)*1.0/nullif(coalesce(total_wins,0)+coalesce(total_losses,0),0) DESC',
+        rated:'rated_count DESC', players:'player_count DESC'};
+      const order=orderMap[q.sort]||orderMap.players;
+      const rows=Q(`SELECT c.club_id,c.name,c.abbrev,c.city,
         coalesce(pc.n,0) player_count,
         coalesce(pr.rated_count,0) rated_count,
         coalesce(pr.total_wins,0) total_wins,
@@ -638,12 +667,13 @@ syncPalBtns();
         FROM clubs c
         LEFT JOIN (SELECT club_id,count(*) n FROM players GROUP BY club_id) pc ON pc.club_id=c.club_id
         LEFT JOIN (SELECT club_id,count(*) rated_count,sum(wins) total_wins,sum(losses) total_losses,round(avg(rating)) avg_rating FROM player_ratings GROUP BY club_id) pr ON pr.club_id=c.club_id
-        WHERE ${w.join(' AND ')} ORDER BY player_count DESC LIMIT ?`,[...p,lim]);
-      return {clubs:rows};
+        WHERE ${w.join(' AND ')} ORDER BY ${order} LIMIT ?`,[...p,lim]);
+      const cities=Q("SELECT DISTINCT city FROM clubs WHERE city IS NOT NULL AND city<>'' ORDER BY city").map(r=>r.city);
+      return {clubs:rows,cities};
     },
     club(id){
       id=+id;
-      const c=one(`SELECT c.club_id,c.name,c.city,
+      const c=one(`SELECT c.club_id,c.name,c.abbrev,c.city,
         coalesce(pc.n,0) player_count,
         coalesce(pr.rated_count,0) rated_count,
         coalesce(pr.total_wins,0) total_wins,
@@ -654,6 +684,7 @@ syncPalBtns();
         LEFT JOIN (SELECT club_id,count(*) rated_count,sum(wins) total_wins,sum(losses) total_losses,round(avg(rating)) avg_rating FROM player_ratings GROUP BY club_id) pr ON pr.club_id=c.club_id
         WHERE c.club_id=?`,[id]);
       if(!c) return {error:'not found'};
+      c.tournament_count=scalar('SELECT count(*) FROM tournaments WHERE club_id=?',[id]);
       const d12=new Date();d12.setMonth(d12.getMonth()-6);
       const cutoff=d12.toISOString().slice(0,10).replace(/-/g,'');
       const players=Q(`SELECT p.player_id,p.name,p.birth_year,p.gender,
@@ -724,7 +755,7 @@ syncPalBtns();
         byGender[g].total++;
         if(aw)byGender[g].aWins++;else byGender[g].bWins++;
       }
-      const matches=rows.map(r=>({...r,score:buildSetScore(r.match_id,r.winner_id===r.p1_id),fullScore:buildScore(r.match_id,r.winner_id===r.p1_id)}));
+      const matches=rows.map(r=>({...r,score:buildSetScore(r.match_id,r.winner_id===r.p1_id),fullScore:buildScore(r.match_id,r.winner_id===r.p1_id),sets:buildSetCols(r.match_id,r.winner_id===r.p1_id)}));
       return {matches,aWins,bWins,total:matches.length,byGender};
     }
   };
@@ -781,7 +812,7 @@ function sortTable(th){
   rows.sort((ra,rb)=>cmpVal(parse(ra.cells[col]?.textContent),parse(rb.cells[col]?.textContent),dir));
   rows.forEach(r=>tbody.appendChild(r));
 }
-const ageP=a=>a?`<span class="pill age">${a} Yaş</span>`:'';
+const ageP=(a,short)=>a?`<span class="pill age">${short?a:`${a} Yaş`}</span>`:'';
 const fmtWL=(w,l)=>`<span class="w">${w}</span>-<span class="l">${l}</span>`;
 let cmpSlots=[null,null];
 function addToCmp(id,name){
@@ -836,7 +867,7 @@ async function home(){
       ${recItem('En çok maç',rec.mostMatches,'kariyer maçı')}
       ${recItem('En iyi galibiyet %',rec.bestPct,rec.bestPct?`${rec.bestPct.wins}-${rec.bestPct.losses} · min 30 maç`:'')}
       ${recItem('En genç reytingli',rec.youngest,rec.youngest?`doğumlu · ${rec.youngest.rating} Elo`:'')}
-      ${recItem('En büyük yükseliş',rec.biggestRise,'son 6 ay')}
+      ${recItem('En büyük yükseliş',rec.biggestRise,'tüm zamanlar')}
       ${recItem('En çok turnuva',rec.mostTournaments,'farklı turnuva')}
     </div>`;
   // --- Kulüp güç sıralaması ---
@@ -913,7 +944,7 @@ async function home(){
       <p style="color:var(--dim);margin:8px 0 0;font-size:15.5px;max-width:540px">Türkiye genelindeki junior turnuva sonuçlarından hesaplanan Elo reytingi, sıralamalar ve head-to-head — antrenörler ve veliler için.</p>
     </div>
     <div class="cards">
-      ${statCard(s.activeRatedPlayers.toLocaleString('tr'),'Aktif Oyuncu · son 6 ay','#/players')}
+      ${statCard(s.activeRatedPlayers.toLocaleString('tr'),'Toplam Oyuncu','#/rankings')}
       ${statCard(s.completed.toLocaleString('tr'),'Skorlu Maç','#/rankings')}
       ${statCard(s.tournaments.toLocaleString('tr'),'Turnuva','#/tournaments')}
       ${statCard(s.clubs.toLocaleString('tr'),'Kulüp','#/clubs')}
@@ -937,26 +968,35 @@ async function home(){
     </details>`;
 }
 
+function nameParts(name){ name=name||''; const i=name.indexOf(' '); return i<0?[name,'']:[name.slice(0,i),name.slice(i+1)]; }
+
 function genderP(g){ if(!g) return ''; const c=g==='Erkek'?'#4ab0ff':'#ff7ab0';
   return `<span class="pill" style="color:${c};border-color:${c}44">${g==='Erkek'?'E':'K'}</span>`; }
+
+function ageGenderP(a,g){ if(!a&&!g) return ''; const c=g==='Erkek'?'#4ab0ff':g==='Kadın'?'#ff7ab0':'#888';
+  return `<span class="pill" style="background:${c};border-color:${c};color:#fff">${a||''}</span>`; }
 function rankTable(rows, rankField){
   if(!rows.length) return '<p class="muted">kayıt yok</p>';
   rankField=rankField||'overall_rank';
   return `<table><thead><tr>
-    <th class="rk-cmp"></th><th onclick="sortTable(this)" style="cursor:pointer">#</th><th onclick="sortTable(this)" style="cursor:pointer">Oyuncu</th><th onclick="sortTable(this)" style="cursor:pointer" style="font-size:11px">Doğ.</th><th class="rk-cat" onclick="sortTable(this)" style="cursor:pointer">Kat.</th><th onclick="sortTable(this)" style="cursor:pointer">Reyting</th><th class="rk-kp" onclick="sortTable(this)" style="cursor:pointer">Puan</th><th class="rk-wl" onclick="sortTable(this)" style="cursor:pointer">G-M</th><th class="rk-club" onclick="sortTable(this)" style="cursor:pointer">Kulüp</th></tr></thead><tbody>
+    <th class="rk-cmp"></th><th onclick="sortTable(this)" style="cursor:pointer">#</th><th onclick="sortTable(this)" style="cursor:pointer">Oyuncu</th><th class="rk-dob" onclick="sortTable(this)" style="cursor:pointer;font-size:11px">Doğ.</th><th class="rk-cat" onclick="sortTable(this)" style="cursor:pointer">Kat.</th><th onclick="sortTable(this)" style="cursor:pointer">Reyting</th><th class="rk-pct" onclick="sortTable(this)" style="cursor:pointer">Kazanma %</th><th class="rk-kp" onclick="sortTable(this)" style="cursor:pointer">Puan</th><th class="rk-wl" onclick="sortTable(this)" style="cursor:pointer">G-M</th><th class="rk-club" onclick="sortTable(this)" style="cursor:pointer">Kulüp</th></tr></thead><tbody>
     ${rows.map(p=>{
       const rk=p[rankField]!=null?p[rankField]:p.overall_rank;
       const undef=p.losses===0&&p.wins>=10?' <span class="undef" title="namağlup">★</span>':'';
       const inSlot=cmpSlots.some(s=>s&&s.id===String(p.player_id));
+      const [nf,nl]=nameParts(p.name);
+      const abv=p.club_abbrev||(p.club_name==='FERDI'?'FERDI':'');
+      const pct=p.matches!=null&&(p.wins+p.losses)>0?Math.round(p.wins/(p.wins+p.losses)*100):null;
       return `<tr>
         <td class="rk-cmp" style="padding:0 4px"><button class="cmp-btn ${inSlot?'in-slot':''}" data-pid="${p.player_id}" data-name="${esc(p.name)}" onclick="addToCmp(this.dataset.pid,this.dataset.name)" title="Karşılaştırmaya ekle">${inSlot?'✓':'⇄'}</button></td>
-        <td class="rank ${rk<=3?'top':''}">${rk}</td>
-        <td><a href="#/player/${p.player_id}">${esc(p.name)}</a>${undef}</td>
-        <td class="muted" style="font-size:11px">${p.birth_year||'—'}</td>
-        <td class="rk-cat flex">${ageP(p.age_group)}${genderP(p.gender)}</td>
-        <td class="rating">${Math.round(p.rating)}</td>
+        <td class="rank ${rk!=null&&rk<=3?'top':''}">${rk!=null?rk:'<span class="muted">—</span>'}</td>
+        <td><a href="#/player/${p.player_id}" class="rk-name"><span class="rk-name2">${esc(nf)}</span>${nl?`<span class="rk-name2">${esc(nl)}</span>`:''}<span class="rk-club-inline muted">${esc(abv)}</span></a>${undef}</td>
+        <td class="rk-dob muted" style="font-size:11px">${p.birth_year||'—'}</td>
+        <td class="rk-cat" style="text-align:center"><div class="flex" style="justify-content:center">${ageGenderP(p.age_group,p.gender)}</div><div class="rk-cat-inline muted" style="font-size:.78em">${p.birth_year||''}</div></td>
+        <td class="rating" style="text-align:center">${p.rating!=null?Math.round(p.rating):'<span class="muted">—</span>'}<div class="rk-pct-inline muted" style="font-size:.78em">${pct!=null?pct+'%':''}</div></td>
+        <td class="rk-pct" style="text-align:center">${pct!=null?pct+'%':'<span class="muted">—</span>'}</td>
         <td class="rk-kp" style="font-family:var(--font-mono);font-weight:600;font-variant-numeric:tabular-nums">${p.kp!=null?p.kp:'<span class="muted">—</span>'}</td>
-        <td class="rk-wl">${fmtWL(p.wins,p.losses)}</td>
+        <td class="rk-wl">${p.matches!=null?fmtWL(p.wins,p.losses):'<span class="muted">—</span>'}</td>
         <td class="rk-club muted">${esc(p.club_name||'')}</td></tr>`;}).join('')}
     </tbody></table>`;
 }
@@ -966,31 +1006,35 @@ async function rankings(params){
   // kat = "12_Erkek" style; fall back to legacy age_group+gender params
   const kat=params.kat||(params.age_group&&params.gender?params.age_group+'_'+params.gender:'');
   const [ag,gn]=kat?kat.split('_'):[(params.age_group||''),(params.gender||'')];
-  const by=params.birth_year||'', cid=params.club_id||'', cnm=params.club_name||'', allTime=params.all_time||'';
+  const by=params.birth_year||'', cid=params.club_id||'', cnm=params.club_name||'', activeOnly=params.active_only||'', qstr=params.q||'';
   const limit=50, page=Math.max(1,parseInt(params.page||'1')), offset=(page-1)*limit;
   const katOpts=['',...[8,9,10,12,14].flatMap(a=>['Erkek','Kadın'].map(g=>`${a}_${g}`))];
   const katLabel=k=>k?(k.split('_')[0]+' Yaş '+k.split('_')[1]):'Tüm Kategoriler';
   app().innerHTML=`
-    <div style="font-family:var(--font-mono);font-size:11.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--accent-ink);margin-bottom:4px">REYTING SIRALAMASI</div>
-    <h1 style="margin:0 0 16px">Sıralama</h1>
+    <div style="font-family:var(--font-mono);font-size:11.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--accent-ink);margin-bottom:4px">OYUNCU DİZİNİ &amp; REYTİNG</div>
+    <h1 style="margin:0 0 16px">Oyuncular</h1>
     <div class="filters">
+      <input id="fQ" placeholder="oyuncu ara…" autocomplete="off" value="${esc(qstr)}" style="font-size:16px;min-width:140px">
       <select id="fKat">${katOpts.map(k=>`<option value="${k}" ${k===kat?'selected':''}>${katLabel(k)}</option>`).join('')}</select>
       <select id="fYear"><option value="">Tüm Doğum Yılları</option></select>
       <div class="picker" style="position:relative;flex:1;min-width:140px">
         <input id="fClub" placeholder="kulüp ara…" autocomplete="off" value="${esc(cnm)}" style="width:100%;font-size:16px">
         <div class="results" id="fClubRes"></div>
       </div>
-      <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:14px;color:var(--txt2);white-space:nowrap"><input type="checkbox" id="fAllTime" ${allTime?'checked':''}> Tüm zamanlar</label>
+      <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:14px;color:var(--txt2);white-space:nowrap"><input type="checkbox" id="fActiveOnly" ${activeOnly?'checked':''}> Son 6 ay aktif</label>
     </div>
+    <div class="muted" style="font-size:12px;margin:-8px 0 14px">${activeOnly?'Sadece son 6 ayda maçı olan oyuncular gösteriliyor.':'Tüm oyuncular gösteriliyor (reytingi olmayanlar dahil).'}</div>
     <div id="rk" class="loading">yükleniyor…</div>`;
   let _cid=cid, _cnm=cnm;
   const nav=(newCid,newCnm)=>{
     if(newCid!==undefined){_cid=newCid;_cnm=newCnm||'';}
-    location.hash='#/rankings'+qs({kat:$('#fKat').value,birth_year:$('#fYear').value,club_id:_cid,club_name:_cnm,all_time:$('#fAllTime').checked?'1':''});
+    location.hash='#/rankings'+qs({kat:$('#fKat').value,birth_year:$('#fYear').value,club_id:_cid,club_name:_cnm,active_only:$('#fActiveOnly').checked?'1':'',q:$('#fQ').value.trim()});
   };
   $('#fKat').onchange=()=>nav();
   $('#fYear').onchange=()=>nav();
-  $('#fAllTime').onchange=()=>nav();
+  $('#fActiveOnly').onchange=()=>nav();
+  let qt;
+  $('#fQ').oninput=()=>{clearTimeout(qt); qt=setTimeout(()=>nav(),350);};
   const clubInp=$('#fClub'), clubRes=$('#fClubRes');
   let ct;
   clubInp.oninput=()=>{
@@ -1007,13 +1051,13 @@ async function rankings(params){
     },200);
   };
   clubInp.onblur=()=>setTimeout(()=>clubRes.classList.remove('show'),200);
-  const r=await api('/rankings'+qs({age_group:ag,gender:gn,birth_year:by,club_id:cid,all_time:allTime,limit,offset}));
+  const r=await api('/rankings'+qs({age_group:ag,gender:gn,birth_year:by,club_id:cid,active_only:activeOnly,q:qstr,limit,offset}));
   $('#fYear').innerHTML='<option value="">Tüm Doğum Yılları</option>'+(r.years||[]).map(y=>`<option value="${y}" ${y==by?'selected':''}>${y}</option>`).join('');
   const rankField=ag?'age_group_rank':(gn?'gender_rank':'overall_rank');
   const labelParts=[kat?katLabel(kat):'',by?by+' doğumlu':'',cnm].filter(Boolean);
   const label=labelParts.join(' · ')||'Genel';
   const pages=Math.ceil(r.total/limit);
-  const mk=(p,lbl,dis)=>dis?`<span class="btn" style="opacity:.4">${lbl}</span>`:`<a class="btn" href="#/rankings${qs({kat,birth_year:by,club_id:cid,club_name:cnm,page:p})}">${lbl}</a>`;
+  const mk=(p,lbl,dis)=>dis?`<span class="btn" style="opacity:.4">${lbl}</span>`:`<a class="btn" href="#/rankings${qs({kat,birth_year:by,club_id:cid,club_name:cnm,active_only:activeOnly,q:qstr,page:p})}">${lbl}</a>`;
   const pager=pages>1?`<div class="flex" style="margin:14px 0;justify-content:center;gap:12px">${mk(page-1,'‹ Önceki',page<=1)}<span class="muted">${page} / ${pages}</span>${mk(page+1,'Sonraki ›',page>=pages)}</div>`:'';
   $('#rk').outerHTML=`<div id="rk"><p class="muted" style="margin:0 0 10px">${esc(label)} · ${r.total.toLocaleString('tr')} oyuncu</p>${rankTable(r.rankings,rankField)}${pager}</div>`;
 }
@@ -1072,11 +1116,11 @@ async function player(id){
     const tmap=new Map();
     ms.forEach(m=>{
       const key=m.tournamentId||('__'+(m.tournamentName||'?'));
-      if(!tmap.has(key)) tmap.set(key,{id:m.tournamentId,name:m.tournamentName||'—',event:m.event,city:m.city,matches:[],w:0,l:0,latestDk:0});
+      if(!tmap.has(key)) tmap.set(key,{id:m.tournamentId,name:m.tournamentName||'—',event:m.event,city:m.city,matches:[],w:0,l:0,latestDk:0,minDk:Infinity,minDate:'',maxDate:''});
       const t=tmap.get(key);
       t.matches.push(m);
       m.won?t.w++:t.l++;
-      const d=dk(m.date); if(d>t.latestDk) t.latestDk=d;
+      const d=dk(m.date); if(d>t.latestDk){t.latestDk=d;t.maxDate=m.date;} if(m.date&&d<t.minDk){t.minDk=d;t.minDate=m.date;}
     });
     const tours=[...tmap.values()].sort((a,b)=>b.latestDk-a.latestDk);
 
@@ -1122,7 +1166,8 @@ async function player(id){
         </div>`;
       }).join('');
       const wc=t.w>t.l?'var(--win)':t.w<t.l?'var(--loss)':'var(--dim)';
-      const meta=[t.event,t.city].filter(Boolean).join(' · ');
+      const dateStr=t.minDate&&t.maxDate&&t.minDate!==t.maxDate?`${t.minDate} - ${t.maxDate}`:(t.minDate||t.maxDate||'');
+      const meta=[t.event,t.city,dateStr].filter(Boolean).join(' · ');
       return `<details${ti===0?' open':''} style="border:1px solid var(--line);border-radius:var(--radius);margin-bottom:8px;overflow:hidden">
         <summary style="list-style:none;cursor:pointer;padding:11px 16px;display:flex;align-items:center;gap:12px;background:var(--panel2);user-select:none">
           <span style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:${wc};min-width:52px;flex-shrink:0">${t.w}G ${t.l}M</span>
@@ -1225,7 +1270,10 @@ async function player(id){
     <div class="profile-head">
       <div class="profile-info">
         <div style="font-family:var(--font-mono);font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-bottom:8px">Oyuncu profili</div>
-        <h1 style="margin:0 0 12px;line-height:1.04">${name}</h1>
+        <div class="flex" style="align-items:center;gap:10px">
+          <h1 style="margin:0 0 12px;line-height:1.04">${name}</h1>
+          <button class="cmp-btn ${cmpSlots.some(s=>s&&s.id===String(id))?'in-slot':''}" data-pid="${id}" data-name="${name}" onclick="addToCmp(this.dataset.pid,this.dataset.name)" title="Karşılaştırmaya ekle" style="margin-bottom:10px">${cmpSlots.some(s=>s&&s.id===String(id))?'✓':'⇄'}</button>
+        </div>
         <div class="flex">${ageP(r&&r.age_group)}
           ${b&&b.birth_year?`<span class="pill">${b.birth_year} doğ.</span>`:''}
           ${b&&b.gender?`<span class="pill">${esc(b.gender)}</span>`:''}
@@ -1737,27 +1785,41 @@ async function h2h(a,b){
 }
 
 // ---------- Clubs ----------
-async function clubs(){
+async function clubs(params){
+  params=params||{};
+  let sort=params.sort||'players', city=params.city||'', term=params.q||'';
   app().innerHTML=`<div style="font-family:var(--font-mono);font-size:11.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--accent-ink);margin-bottom:4px">KULÜP DİZİNİ</div>
     <h1 style="margin:0 0 16px">Kulüpler</h1>
-    <input id="cq" placeholder="kulüp ara…" style="width:100%;background:var(--panel);border:1px solid var(--line);color:var(--txt);padding:11px 14px;border-radius:10px;font-size:15px;outline:none;margin-bottom:16px;box-sizing:border-box">
+    <div class="filters">
+      <input id="cq" value="${esc(term)}" placeholder="kulüp ara…" style="background:var(--panel);border:1px solid var(--line);color:var(--txt);padding:10px 14px;border-radius:10px;font-size:15px;outline:none;flex:1;min-width:160px">
+      <select id="cCity"><option value="">Tüm Şehirler</option></select>
+      <select id="cSort">
+        <option value="players" ${sort==='players'?'selected':''}>Oyuncu sayısı</option>
+        <option value="elo" ${sort==='elo'?'selected':''}>Ort. Elo</option>
+        <option value="pct" ${sort==='pct'?'selected':''}>Kazanma %</option>
+        <option value="rated" ${sort==='rated'?'selected':''}>Reytingli oyuncu</option>
+      </select>
+    </div>
     <div id="cl" class="loading">yükleniyor…</div>`;
-  const load=async term=>{const d=await api('/clubs'+qs({q:term||'',limit:200}));
-    $('#cl').outerHTML=`<div id="cl"><div class="club-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:13px">
-      ${d.clubs.map(c=>{const tot=c.total_wins+c.total_losses,pct=tot?Math.round(c.total_wins/tot*100):null;
-        return`<div class="card" style="cursor:pointer;padding:16px 18px" onclick="location.hash='#/club/${c.club_id}'">
-        <div style="font-weight:700;letter-spacing:-.01em;font-size:16px">${esc(c.name)}</div>
+  const load=async()=>{const d=await api('/clubs'+qs({q:$('#cq').value||'',city:$('#cCity').value,sort:$('#cSort').value,limit:300}));
+    if(!$('#cCity').dataset.filled){$('#cCity').innerHTML='<option value="">Tüm Şehirler</option>'+(d.cities||[]).map(c=>`<option value="${esc(c)}" ${c==city?'selected':''}>${esc(c)}</option>`).join('');$('#cCity').dataset.filled='1';}
+    $('#cl').outerHTML=`<div id="cl"><p class="muted" style="margin:0 0 12px">${d.clubs.length} kulüp</p><div class="club-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,250px),1fr));gap:13px">
+      ${d.clubs.map(c=>{const tot=c.total_wins+c.total_losses,pct=tot>=20?Math.round(c.total_wins/tot*100):null,pctRaw=tot?Math.round(c.total_wins/tot*100):null;
+        return`<div class="card" style="cursor:pointer;padding:16px 18px;min-width:0" onclick="location.hash='#/club/${c.club_id}'">
+        <div style="display:flex;align-items:baseline;gap:8px"><div style="font-weight:700;letter-spacing:-.01em;font-size:16px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.name)}</div>${c.abbrev?`<span style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--accent2);flex-shrink:0">${esc(c.abbrev)}</span>`:''}</div>
         <div style="color:var(--dim);font-size:12px;margin-top:2px;margin-bottom:14px">${esc(c.city||'—')}</div>
         <div style="display:flex;gap:18px;flex-wrap:wrap">
           <div><div style="font-family:var(--font-mono);font-size:18px;font-weight:700;color:var(--accent-ink)">${c.player_count}</div><div style="font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;font-weight:700">Oyuncu</div></div>
           <div><div style="font-family:var(--font-mono);font-size:18px;font-weight:700;color:var(--accent-ink)">${c.avg_rating!=null?c.avg_rating:'—'}</div><div style="font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;font-weight:700">Ort. Elo</div></div>
           <div><div style="font-family:var(--font-mono);font-size:18px;font-weight:700;color:var(--txt)">${tot?`<span class="w">${c.total_wins}</span>/<span class="l">${c.total_losses}</span>`:'—'}</div><div style="font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;font-weight:700">G/M</div></div>
-          <div><div style="font-family:var(--font-mono);font-size:18px;font-weight:700;color:var(--gold)">${pct!=null?pct+'%':'—'}</div><div style="font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;font-weight:700">G%</div></div>
+          <div><div style="font-family:var(--font-mono);font-size:18px;font-weight:700;color:${pct!=null?'var(--gold)':'var(--dim)'}" title="${pct==null&&pctRaw!=null?'<20 maç, güvenilir değil: %'+pctRaw:''}">${pct!=null?pct+'%':(pctRaw!=null?'·':'—')}</div><div style="font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;font-weight:700">G%</div></div>
         </div>
       </div>`;}).join('')}
       </div></div>`;};
-  $('#cq').oninput=e=>load(e.target.value);
-  load('');
+  const nav=()=>location.hash='#/clubs'+qs({q:$('#cq').value,city:$('#cCity').value,sort:$('#cSort').value});
+  $('#cCity').onchange=nav; $('#cSort').onchange=nav;
+  let t; $('#cq').oninput=e=>{clearTimeout(t);t=setTimeout(load,300);};
+  load();
 }
 
 // ---------- Club Detail ----------
@@ -1767,7 +1829,8 @@ async function clubDetail(id){
   if(d.error){app().innerHTML='<p class="muted">Kulüp bulunamadı.</p>';return;}
   const c=d.club;
   const tot=c.total_wins+c.total_losses;
-  const pct=tot?Math.round(c.total_wins/tot*100):null;
+  const pct=tot>=20?Math.round(c.total_wins/tot*100):null;
+  const activeCount=d.players.length;
 
   // group players by age_group then gender
   const CY=new Date().getFullYear();
@@ -1789,12 +1852,14 @@ async function clubDetail(id){
     if(!genders.length)return'';
     const cols=genders.map(g=>{
       const ps=grp[g];
-      const rows=ps.map(p=>`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)">
+      const rows=ps.map(p=>{const pl=(p.wins||0)+(p.losses||0),wp=pl?Math.round(p.wins/pl*100):null;
+        return`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)">
         <span style="font-family:var(--font-mono);font-size:11px;color:var(--dim);min-width:26px;text-align:right">${p.age_group_rank?'#'+p.age_group_rank:''}</span>
         <a href="#/player/${p.player_id}" style="flex:1;font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.name)}</a>
         ${p.birth_year?`<span class="tag">${p.birth_year}</span>`:''}
+        <span style="font-family:var(--font-mono);font-size:11px;color:var(--dim);min-width:34px;text-align:right" title="${p.wins||0}G ${p.losses||0}M">${wp!=null?wp+'%':''}</span>
         <span style="font-family:var(--font-mono);font-size:13px;font-weight:700;min-width:38px;text-align:right;${p.rating!=null?'color:var(--accent-ink)':'color:var(--dim)'}">${p.rating!=null?Math.round(p.rating):'—'}</span>
-      </div>`).join('');
+      </div>`;}).join('');
       return`<div style="flex:1;min-width:0">
         <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--line)">${esc(g)} <span style="font-weight:400">${ps.length}</span></div>
         ${rows}
@@ -1809,11 +1874,12 @@ async function clubDetail(id){
   }).join('');
 
   const tourSection=d.tournaments.length?`<div class="card" style="padding:20px 22px;margin-bottom:14px">
-    <h2 style="margin:0 0 14px">Düzenlenen Turnuvalar</h2>
+    <h2 style="margin:0 0 14px">Düzenlenen Turnuvalar <span style="font-family:var(--font-mono);font-size:14px;color:var(--dim);font-weight:600">${c.tournament_count||d.tournaments.length}</span></h2>
     ${d.tournaments.map(t=>`<div class="matchline">
       <a href="#/tournament/${t.tournament_id}">${esc(t.name)}</a>
       <span style="margin-left:auto;color:var(--dim);font-size:12px">${esc(t.city||'')}${t.city&&t.start_date?' · ':''}${esc(t.start_date||t.year||'')}</span>
     </div>`).join('')}
+    ${(c.tournament_count||0)>d.tournaments.length?`<p class="muted" style="margin:12px 0 0;font-size:12px">İlk ${d.tournaments.length} gösteriliyor (toplam ${c.tournament_count}).</p>`:''}
   </div>`:'';
 
   app().innerHTML=`
@@ -1823,11 +1889,15 @@ async function clubDetail(id){
     <div class="profile-head">
       <div class="profile-info">
         <div style="font-family:var(--font-mono);font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-bottom:8px">Kulüp Profili</div>
-        <h1 style="margin:0 0 12px;line-height:1.04">${esc(c.name)}</h1>
+        <div class="flex" style="align-items:baseline;gap:10px;flex-wrap:wrap">
+          <h1 style="margin:0 0 12px;line-height:1.04">${esc(c.name)}</h1>
+          ${c.abbrev?`<span style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--accent2)">${esc(c.abbrev)}</span>`:''}
+        </div>
         <div class="flex" style="flex-wrap:wrap;gap:6px">
           ${c.city?`<span class="pill">${esc(c.city)}</span>`:''}
           <span class="pill">${c.player_count} oyuncu</span>
           ${c.rated_count?`<span class="pill">${c.rated_count} reytingli</span>`:''}
+          ${c.tournament_count?`<span class="pill">${c.tournament_count} turnuva</span>`:''}
         </div>
       </div>
       <div class="profile-score">
@@ -1845,10 +1915,11 @@ async function clubDetail(id){
       <div class="card"><div class="v" style="${pct!=null?'color:var(--gold)':''}">${pct!=null?pct+'%':'—'}</div><div class="l">Kazanma %</div></div>
     </div>
     <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap">
-      <a href="#/rankings?club_id=${c.club_id}" class="btn">Elo Sıralaması →</a>
-      <a href="#/players?club_id=${c.club_id}&club_name=${encodeURIComponent(c.name)}" class="btn">Oyuncu Dizini →</a>
+      <a href="#/rankings?club_id=${c.club_id}&club_name=${encodeURIComponent(c.name)}" class="btn">Oyuncular →</a>
+      <a href="#/compare-clubs?a=${c.club_id}&an=${encodeURIComponent(c.name)}" class="btn">Kulüp Karşılaştır →</a>
     </div>
-    ${sections||'<p class="muted">Kayıtlı oyuncu bulunamadı.</p>'}
+    <p class="muted" style="margin:0 0 14px;font-size:13px">Aşağıdaki kadro son 6 ayda aktif oyuncuları gösterir: <strong style="color:var(--txt2)">${activeCount}</strong> / ${c.player_count} oyuncu.</p>
+    ${sections||'<p class="muted">Son 6 ayda aktif oyuncu bulunamadı.</p>'}
     ${tourSection}
   `;
 }
@@ -1924,37 +1995,43 @@ async function players_dir(params){
 }
 
 // ---------- Tournaments ----------
+function isWeekendTour(t){ return /haftasonu|lig/i.test((t.name||'')+' '+(t.title||'')+' '+(t.type_text||'')); }
 async function tournaments(params){
-  const yr=params.year||'', term=params.q||'', incl=params.include_ongoing||'', ag=params.age_group||'';
-  const nav=()=>location.hash='#/tournaments'+qs({year:$('#tYear').value,q:$('#tQ').value,age_group:$('#tAg').value,include_ongoing:$('#tOngoing').checked?'1':''});
+  const yr=params.year||'', term=params.q||'', incl=params.include_ongoing||'', ag=params.age_group||'', city=params.city||'', sort=params.sort||'date';
+  const nav=()=>location.hash='#/tournaments'+qs({year:$('#tYear').value,q:$('#tQ').value,age_group:$('#tAg').value,city:$('#tCity').value,sort:$('#tSort').value,include_ongoing:$('#tOngoing').checked?'1':''});
   app().innerHTML=`<div style="font-family:var(--font-mono);font-size:11.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--accent-ink);margin-bottom:4px">TURNUVALAR</div>
     <h1 style="margin:0 0 16px">Turnuvalar</h1>
     <div class="filters">
       <select id="tYear"><option value="">Tüm Yıllar</option></select>
       <select id="tAg"><option value="">Tüm Yaş Grupları</option></select>
+      <select id="tCity"><option value="">Tüm Şehirler</option></select>
+      <select id="tSort"><option value="date" ${sort==='date'?'selected':''}>Tarihe göre</option><option value="size" ${sort==='size'?'selected':''}>Büyüklüğe göre</option></select>
       <input id="tQ" value="${esc(term)}" placeholder="turnuva / şehir ara…" style="background:var(--panel);border:1px solid var(--line);color:var(--txt);padding:10px 14px;border-radius:10px;outline:none;font-size:15px;flex:1;min-width:160px">
       <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:14px;color:var(--txt2);white-space:nowrap"><input type="checkbox" id="tOngoing" ${incl?'checked':''}> Güncel turnuvaları da göster</label>
     </div>
     <div id="tl" class="loading">yükleniyor…</div>`;
-  const d=await api('/tournaments'+qs({year:yr,q:term,age_group:ag,include_ongoing:incl,limit:700}));
+  const d=await api('/tournaments'+qs({year:yr,q:term,age_group:ag,city:city,sort:sort,include_ongoing:incl,limit:700}));
   $('#tYear').innerHTML='<option value="">Tüm Yıllar</option>'+d.years.map(y=>`<option value="${y}" ${y==yr?'selected':''}>${y}</option>`).join('');
   $('#tAg').innerHTML='<option value="">Tüm Yaş Grupları</option>'+(d.age_groups||[]).map(a=>`<option value="${a}" ${a==ag?'selected':''}>${a} Yaş</option>`).join('');
-  $('#tYear').onchange=nav; $('#tAg').onchange=nav; $('#tOngoing').onchange=nav;
+  $('#tCity').innerHTML='<option value="">Tüm Şehirler</option>'+(d.cities||[]).map(c=>`<option value="${esc(c)}" ${c==city?'selected':''}>${esc(c)}</option>`).join('');
+  $('#tYear').onchange=nav; $('#tAg').onchange=nav; $('#tCity').onchange=nav; $('#tSort').onchange=nav; $('#tOngoing').onchange=nav;
   let t; $('#tQ').oninput=e=>{clearTimeout(t);t=setTimeout(nav,350);};
   $('#tl').outerHTML=`<div id="tl"><p class="muted" style="margin:0 0 12px">${d.total} turnuva</p>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:13px">
-    ${d.tournaments.map(t=>`<div class="card" style="cursor:pointer;padding:16px 18px" onclick="location.hash='#/tournament/${t.tournament_id}'">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+    ${d.tournaments.map(t=>{const wknd=isWeekendTour(t);return `<div class="card" style="cursor:pointer;padding:16px 18px;${wknd?'border-left:3px solid var(--accent2)':''}" onclick="location.hash='#/tournament/${t.tournament_id}'">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
         ${t.source_tab==='guncel'?'<span style="display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:7px;background:var(--win-soft);color:var(--win);font-size:11px;font-weight:700"><span style="width:7px;height:7px;border-radius:50%;background:var(--win)"></span>Canlı</span>':''}
+        ${wknd?'<span style="padding:2px 9px;border-radius:7px;background:var(--accent2-soft);color:var(--accent2);font-size:11px;font-weight:700">Hafta Sonu / Lig</span>':''}
         <span style="font-family:var(--font-mono);font-size:11.5px;color:var(--dim)">${esc((t.start_date||'').replace(/\s*\(\d+\).*/,'').trim().replace(/-/g,'.'))}</span>
       </div>
       <div style="font-weight:700;letter-spacing:-.01em;margin-bottom:10px;font-size:16px">${esc(t.name)}</div>
       <div style="display:flex;gap:7px;flex-wrap:wrap">
         ${t.city?`<span class="pill" style="background:var(--panel2);color:var(--txt2)">${esc(t.city)}</span>`:''}
         ${t.surface?`<span class="pill" style="background:var(--panel2);color:var(--txt2)">${esc(t.surface)}</span>`:''}
+        ${t.player_count?`<span class="pill" style="background:var(--panel2);color:var(--txt2);font-family:var(--font-mono)">${t.player_count} oyuncu</span>`:''}
         <span class="pill" style="background:var(--accent2-soft);color:var(--accent2);font-family:var(--font-mono)">${t.match_count||0} maç</span>
       </div>
-    </div>`).join('')}
+    </div>`;}).join('')}
     </div></div>`;
 }
 
@@ -1973,8 +2050,10 @@ async function tournament(id){
     </div>`;
   const cats=d.categories.map(c=>`<div class="card" style="cursor:pointer" onclick="window.tfilter('${esc(c.event).replace(/'/g,'')}')">
       <div class="flex">${ageP(c.age_group)}${genderP(c.gender)}</div>
-      <div style="margin:6px 0 2px;font-weight:600">${esc(c.event)}</div>
-      <div class="tag">${c.n} maç${c.championName?` · 🏆 ${esc(c.championName)}`:''}</div>
+      <div style="margin:6px 0 6px;font-weight:600">${esc(c.event)}</div>
+      ${c.championName?`<div style="display:flex;align-items:center;gap:7px;font-size:13px;margin-bottom:3px"><span style="flex-shrink:0">🏆</span><a href="#/player/${c.championId}" onclick="event.stopPropagation()" style="color:var(--gold);font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.championName)}</a></div>`:''}
+      ${c.finalistName?`<div style="display:flex;align-items:center;gap:7px;font-size:12px;margin-bottom:5px;color:var(--txt2)"><span style="flex-shrink:0;opacity:.6">🥈</span><a href="#/player/${c.finalistId}" onclick="event.stopPropagation()" style="color:var(--txt2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.finalistName)}</a></div>`:''}
+      <div class="tag">${c.n} maç</div>
     </div>`).join('');
   window._tmatches=d.matches;
   const dateKey=s=>{const m=/(\d{2})\.(\d{2})\.(\d{4})/.exec(s||'');return m?m[3]+m[2]+m[1]:'99999999';};
@@ -1989,7 +2068,13 @@ async function tournament(id){
     ${metaGrid}
     <h2>Kategoriler ${d.matches.length?`· ${d.matches.length} maç`:''}</h2>
     <div class="cards">${cats||'<p class="muted">maç verisi yok</p>'}</div>
-    <h2>Maç Programı</h2>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:24px 0 4px">
+      <h2 style="margin:0">Maç Programı</h2>
+      <div style="display:flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;margin-left:auto">
+        <button type="button" id="tvCourt" onclick="window.tsetview('court')" style="padding:7px 14px;border:none;cursor:pointer;font-weight:700;font-size:12.5px">Kort / Gün</button>
+        <button type="button" id="tvRound" onclick="window.tsetview('round')" style="padding:7px 14px;border:none;cursor:pointer;font-weight:700;font-size:12.5px">Tura göre</button>
+      </div>
+    </div>
     <div class="filters"><select id="tmCat"><option value="">Tüm Kategoriler</option>
       ${[...new Set(d.matches.map(m=>m.event))].filter(Boolean).map(e=>`<option value="${esc(e)}">${esc(e)}</option>`).join('')}
     </select><select id="tmStage"><option value="">Tüm Aşamalar</option>
@@ -1997,9 +2082,40 @@ async function tournament(id){
     </select></div>
     <div id="tmdays" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;margin-bottom:14px"></div>
     <div id="tmlist"></div>`;
+  window._tview='court';
   $('#tmCat').onchange=renderTMatches; $('#tmStage').onchange=renderTMatches;
   window.tfilter=ev=>{$('#tmCat').value=ev;renderTMatches();$('#tmlist').scrollIntoView({behavior:'smooth'});};
-  renderTDays(); renderTMatches();
+  window.tsetview=v=>{window._tview=v;renderTViewBtns();renderTMatches();};
+  renderTViewBtns(); renderTDays(); renderTMatches();
+}
+function renderTViewBtns(){
+  const on='background:var(--accent-soft);color:var(--accent-ink)',off='background:var(--panel);color:var(--txt2)';
+  const c=$('#tvCourt'),r=$('#tvRound'); if(!c) return;
+  c.style.cssText='padding:7px 14px;border:none;cursor:pointer;font-weight:700;font-size:12.5px;'+(window._tview==='court'?on:off);
+  r.style.cssText='padding:7px 14px;border:none;cursor:pointer;font-weight:700;font-size:12.5px;'+(window._tview==='round'?on:off);
+}
+const STAGE_ORDER=[[/final/i,100],[/yar[ıi]\s*final/i,90],[/[çc]eyrek/i,80],[/son\s*16/i,70],[/ana\s*tablo/i,50],[/teselli/i,30],[/eleme/i,20],[/grup|haftasonu/i,10]];
+function stageRank(s){ s=s||''; if(/yar[ıi]/i.test(s))return 90; if(/[çc]eyrek/i.test(s))return 80; for(const[re,v]of STAGE_ORDER)if(re.test(s))return v; return 0; }
+function isUpset(m){ return m.resultType==='completed'&&m.winnerRating!=null&&m.loserRating!=null&&(m.loserRating-m.winnerRating)>=50; }
+function upsetBadge(m){ if(!isUpset(m))return ''; const diff=m.loserRating-m.winnerRating;
+  return `<span title="Sürpriz: ${m.winnerRating} reytingli oyuncu ${m.loserRating} reytinglini yendi" style="padding:1px 7px;border-radius:6px;background:#7c3aed22;color:#a78bfa;font-size:10px;font-weight:800;letter-spacing:.03em">⚡ SÜRPRİZ +${diff}</span>`; }
+function matchCard(m,showCat){
+  return `<div class="card" style="padding:10px 12px;margin-bottom:8px;${isUpset(m)?'border:1px solid #7c3aed55':''}">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:6px">
+      <span style="display:flex;align-items:center;gap:6px;font-weight:700;font-size:12px;color:var(--txt)">
+        <span style="width:7px;height:7px;border-radius:50%;flex-shrink:0;background:${m.gender==='Kadın'?'#e0529e':'#2f6fd0'}"></span>${esc(m.matchCode||'')}</span>
+      <span style="font-size:10.5px;font-weight:700;color:var(--dim);white-space:nowrap">${m.startTime?'SAAT '+esc(m.startTime):esc(m.date||'')}</span>
+    </div>
+    <div class="tag" style="margin-bottom:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">${showCat?esc(m.event||''):''}${showCat&&m.stage?' · ':''}${esc(m.stage||'')}${upsetBadge(m)}</div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">
+      <a href="#/player/${m.winnerId}" style="font-weight:700;color:var(--txt);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(m.winnerName)}">${esc(m.winnerName)}${m.winnerRating!=null?`<span style="font-family:var(--font-mono);font-size:10px;color:var(--dim);margin-left:4px">${m.winnerRating}</span>`:''}</a>
+      <span style="display:flex;gap:6px;font-family:var(--font-mono);font-weight:700;color:var(--accent-ink);flex-shrink:0">${setCell(m,'w')}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">
+      <a href="#/player/${m.loserId}" style="color:var(--txt2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(m.loserName)}">${esc(m.loserName)}${m.loserRating!=null?`<span style="font-family:var(--font-mono);font-size:10px;color:var(--dim);margin-left:4px">${m.loserRating}</span>`:''}</a>
+      <span style="display:flex;gap:6px;font-family:var(--font-mono);color:var(--txt2);flex-shrink:0">${setCell(m,'l')}</span>
+    </div>
+  </div>`;
 }
 function renderTDays(){
   $('#tmdays').innerHTML=window._tdays.map(dy=>`<button type="button" onclick="window.tsetday('${esc(dy.date)}')"
@@ -2017,6 +2133,9 @@ function setCell(m,side){
   }).join('');
 }
 function renderTMatches(){
+  const dayWrap=$('#tmdays');
+  if(window._tview==='round'){ if(dayWrap)dayWrap.style.display='none'; renderTRound(); return; }
+  if(dayWrap)dayWrap.style.display='flex';
   const cat=$('#tmCat').value, stg=$('#tmStage').value, day=window._tday;
   let ms=window._tmatches.filter(m=>m.date===day&&(!cat||m.event===cat)&&(!stg||m.stage===stg));
   const courts=[],cidx={};
@@ -2026,24 +2145,24 @@ function renderTMatches(){
     (courts.length?`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px">
       ${courts.map(c=>`<div>
         <h3 style="margin:0 0 10px;font-size:14px;color:var(--accent-ink)">${esc(c.court)}</h3>
-        ${c.items.map(m=>`<div class="card" style="padding:10px 12px;margin-bottom:8px">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:6px">
-            <span style="display:flex;align-items:center;gap:6px;font-weight:700;font-size:12px;color:var(--txt)">
-              <span style="width:7px;height:7px;border-radius:50%;flex-shrink:0;background:${m.gender==='Kadın'?'#e0529e':'#2f6fd0'}"></span>${esc(m.matchCode||'')}</span>
-            <span style="font-size:10.5px;font-weight:700;color:var(--dim);white-space:nowrap">${m.startTime?'SAAT '+esc(m.startTime):''}</span>
-          </div>
-          <div class="tag" style="margin-bottom:6px">${esc(m.event||'')}${m.stage?' · '+esc(m.stage):''}</div>
-          <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">
-            <a href="#/player/${m.winnerId}" style="font-weight:700;color:var(--txt);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(m.winnerName)}">${esc(m.winnerName)}</a>
-            <span style="display:flex;gap:6px;font-family:var(--font-mono);font-weight:700;color:var(--accent-ink);flex-shrink:0">${setCell(m,'w')}</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">
-            <a href="#/player/${m.loserId}" style="color:var(--txt2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(m.loserName)}">${esc(m.loserName)}</a>
-            <span style="display:flex;gap:6px;font-family:var(--font-mono);color:var(--txt2);flex-shrink:0">${setCell(m,'l')}</span>
-          </div>
-        </div>`).join('')}
+        ${c.items.map(m=>matchCard(m,true)).join('')}
       </div>`).join('')}
     </div>`:'<p class="muted">bu güne ait maç yok</p>');
+}
+function renderTRound(){
+  const cat=$('#tmCat').value, stg=$('#tmStage').value;
+  let ms=window._tmatches.filter(m=>(!cat||m.event===cat)&&(!stg||m.stage===stg));
+  const groups=new Map();
+  ms.forEach(m=>{const k=m.stage||'—';if(!groups.has(k))groups.set(k,[]);groups.get(k).push(m);});
+  const dk=s=>{const x=/(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{4})/.exec(s||'');return x?(+x[3])*1e4+(+x[2])*100+(+x[1]):0;};
+  const order=[...groups.keys()].sort((a,b)=>stageRank(b)-stageRank(a)||a.localeCompare(b,'tr'));
+  order.forEach(k=>groups.get(k).sort((a,b)=>dk(b.date)-dk(a.date)||(a.matchCode||'').localeCompare(b.matchCode||'','tr')));
+  $('#tmlist').innerHTML=`<p class="muted" style="margin:0 0 12px">${ms.length} maç · ${order.length} aşama</p>`+
+    (order.length?order.map(k=>{const items=groups.get(k);return `<div style="margin-bottom:18px">
+      <h3 style="margin:0 0 10px;font-size:14px;color:var(--accent-ink);display:flex;align-items:center;gap:8px">${esc(k)}<span style="font-family:var(--font-mono);font-size:11px;color:var(--dim);font-weight:600">${items.length}</span></h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px">
+        ${items.map(m=>matchCard(m,true)).join('')}
+      </div></div>`;}).join(''):'<p class="muted">maç yok</p>');
 }
 
 // ---------- Compare ----------
@@ -2120,21 +2239,18 @@ async function renderClubCompare(a,b,an,bn,gender,ag){
   const ap=ra.rankings||[], bp=rb.rankings||[];
   const avg=arr=>arr.length?Math.round(arr.reduce((s,p)=>s+(p.rating||0),0)/arr.length):0;
   const avgA=avg(ap), avgB=avg(bp);
-  const bar=(va,vb)=>`<div class="bar"><i class="ia" style="width:${va+vb?va/(va+vb)*100:50}%"></i><i class="ib" style="width:${va+vb?vb/(va+vb)*100:50}%"></i></div>`;
-  const cmpRow=(lbl,va,vb,inv)=>{const na=+va||0,nb=+vb||0,hiA=inv?na<nb:na>nb,hiB=inv?nb<na:nb>na;
-    return `<div class="cmp"><div class="lbl">${lbl}</div><div class="va ${hiA?'win-hi':'win-lo'}">${va}</div>${bar(na,nb)}<div class="vb ${hiB?'win-hi':'win-lo'}">${vb}</div></div>`;};
-  const prow=p=>`<tr><td><a href="#/player/${p.player_id}">${esc(p.name)}</a></td><td>${ageP(p.age_group)}</td><td class="rating">${Math.round(p.rating)}</td></tr>`;
+  const prow=p=>{const t=(p.wins||0)+(p.losses||0),wp=t?Math.round(p.wins/t*100):null;
+    return `<tr><td><a href="#/player/${p.player_id}">${esc(p.name)}</a></td><td>${ageP(p.age_group)}</td><td class="muted" style="font-family:var(--font-mono);font-size:11px;text-align:center" title="${p.wins||0}G ${p.losses||0}M">${wp!=null?wp+'%':''}</td><td class="rating">${Math.round(p.rating)}</td></tr>`;};
   const aW=cv.aWins||0,bW=cv.bWins||0,tot=cv.total||0;
   const mkLine=(m)=>{
     const aWon=m.winner_club===+a;
-    const scTxt=m.score||'W.O.';const scTip=m.fullScore||'Walkover';
-    const sc=`<span class="sc-ic" title="${esc(scTip)}">${esc(scTxt)}</span>`;
-    const info=[m.tournament_name,m.event,m.stage,m.match_date].filter(Boolean).join(' · ');
-    const ti=info?(m.tournament_id?`<a href="#/tournament/${m.tournament_id}" class="sc-ic" title="${esc(info)}" style="font-style:italic">i</a>`:`<span class="sc-ic" title="${esc(info)}" style="font-style:italic;cursor:help">i</span>`):'';
-    return `<div class="matchline">
-      <span class="badge" style="background:${aWon?'var(--accent)':'var(--accent2)'};color:#fff">${esc(aWon?an.split(' ')[0]:bn.split(' ')[0])}</span>
-      <span><b><a href="#/player/${m.winner_id}">${esc(m.winner_name)}</a></b> · <a href="#/player/${m.loser_id}" class="muted">${esc(m.loser_name)}</a></span>
-      <span style="margin-left:auto;display:flex;gap:4px;align-items:center;flex-shrink:0">${sc}${ti}</span>
+    const sc=(m.sets&&m.sets.length)?setLine(m):`<span class="sc-ic" title="${esc(m.fullScore||'Walkover')}">${esc(m.score||'W.O.')}</span>`;
+    const info=[m.event,m.stage].filter(Boolean).join(' · ');
+    return `<div class="matchline" style="flex-wrap:wrap;gap:6px 10px">
+      <span class="badge" style="background:${aWon?'#3b82f6':'#f97316'};color:#fff;flex-shrink:0">${esc(aWon?an.split(' ')[0]:bn.split(' ')[0])}</span>
+      <span style="flex:1;min-width:0"><b><a href="#/player/${m.winner_id}">${esc(m.winner_name)}</a></b> · <a href="#/player/${m.loser_id}" class="muted">${esc(m.loser_name)}</a></span>
+      <span style="display:flex;gap:5px;align-items:center;flex-shrink:0">${sc}</span>
+      <span class="tag" style="flex-basis:100%;color:var(--dim)">${info?esc(info)+' · ':''}${m.tournament_id?`<a href="#/tournament/${m.tournament_id}">${esc(m.tournament_name||'turnuva')}</a> · `:''}${esc(m.match_date||'')}</span>
     </div>`;};
   const trendSvg=(ms)=>{
     if(ms.length<2) return '';
@@ -2197,6 +2313,13 @@ async function renderClubCompare(a,b,an,bn,gender,ag){
   const matchSection=gender
     ?`<div style="max-width:500px;margin:0 auto">${filtMs.map(mkLine).join('')||'<p class="muted" style="text-align:center">kayıt yok</p>'}</div>`
     :`<div class="row" style="gap:16px;max-width:900px;margin:0 auto;align-items:start">${col(erkekMs,'Erkek','#4ab0ff')}${col(kadinMs,'Kadın','#ff7ab0')}</div>`;
+  const peakA=ap.length?Math.round(ap[0].rating):0, peakB=bp.length?Math.round(bp[0].rating):0;
+  const pctAh=displayTot?Math.round(displayAW/displayTot*100):0, pctBh=displayTot?Math.round(displayBW/displayTot*100):0;
+  const anS=esc(an.split(' ')[0]), bnS=esc(bn.split(' ')[0]);
+  const cmetr=[[ra.total,rb.total,0],[avgA,avgB,0],[peakA,peakB,0],[displayAW,displayBW,0]];
+  let aLead=0,bLead=0;
+  for(const [va,vb,inv] of cmetr){ if(va==null||vb==null||va===vb)continue; const aw=inv?va<vb:va>vb; if(aw)aLead++;else bLead++; }
+  const leadTxt=aLead>bLead?`<b style="color:#3b82f6">${anS}</b> ${aLead} metrikte önde`:bLead>aLead?`<b style="color:#f97316">${bnS}</b> ${bLead} metrikte önde`:`başa baş (${aLead}–${bLead})`;
   $('#clubCmpOut').innerHTML=`
     ${gTabs}${agTabs}
     <div class="vs">
@@ -2204,12 +2327,18 @@ async function renderClubCompare(a,b,an,bn,gender,ag){
       <div class="vsmid"><span class="c">${displayAW}</span><span class="vsdash">–</span><span class="c vslo">${displayBW}</span></div>
       <div class="n vsb"><a href="#/rankings${qs({club_id:b,club_name:bn})}" style="color:inherit">${esc(bn)}</a><div style="font-family:var(--font-mono);font-size:11px;color:#7c8089;margin-top:2px;font-weight:400">${rb.total} ratingli oyuncu</div></div>
     </div>
+    <p class="sub" style="text-align:center;margin-top:0">${displayTot?displayTot+' maç · ':''}${leadTxt}</p>
     <div class="card" style="margin-bottom:16px">
       <div style="max-width:640px;margin:0 auto">
-        ${cmpRow('Ratingli Oyuncu',ra.total,rb.total)}
-        ${cmpRow('Ort. Reyting (top 15)',avgA,avgB)}
-        ${displayTot?cmpRow('Toplam Maç',displayAW+'G',displayBW+'G'):''}
+        ${grp('Kadro',
+          cmpStatRow('Ratingli Oyuncu',ra.total,rb.total)+
+          cmpStatRow('Ort. Elo (top 15)',avgA,avgB)+
+          cmpStatRow('Zirve Oyuncu',peakA,peakB))}
+        ${displayTot?grp('Karşılaşma (Aralarında)',
+          cmpStatRow('Galibiyet',displayAW,displayBW)+
+          cmpStatRow('Kazanma %',pctAh+'%',pctBh+'%')):''}
       </div>
+      ${displayTot?`<div style="margin-top:6px">${cmpLeadBand(displayAW,displayBW,0,anS,bnS)}</div>`:''}
       ${trendSvg(filtMs)}
     </div>
     <div class="card" style="margin-bottom:16px;padding:0">
@@ -2217,9 +2346,9 @@ async function renderClubCompare(a,b,an,bn,gender,ag){
       <div id="cc-players" style="display:none;padding:0 22px 20px">
         <div class="row" style="gap:16px;max-width:820px;margin:0 auto;align-items:start">
           <div class="col"><p class="tag" style="text-align:center;margin-bottom:6px"><b>${esc(an)}</b></p>
-            <table><thead><tr><th>Oyuncu</th><th></th><th>Reyting</th></tr></thead><tbody>${ap.map(prow).join('')||'<tr><td colspan="3" class="muted">kayıt yok</td></tr>'}</tbody></table></div>
+            <table><thead><tr><th>Oyuncu</th><th></th><th style="text-align:center">G%</th><th>Reyting</th></tr></thead><tbody>${ap.map(prow).join('')||'<tr><td colspan="4" class="muted">kayıt yok</td></tr>'}</tbody></table></div>
           <div class="col"><p class="tag" style="text-align:center;margin-bottom:6px"><b>${esc(bn)}</b></p>
-            <table><thead><tr><th>Oyuncu</th><th></th><th>Reyting</th></tr></thead><tbody>${bp.map(prow).join('')||'<tr><td colspan="3" class="muted">kayıt yok</td></tr>'}</tbody></table></div>
+            <table><thead><tr><th>Oyuncu</th><th></th><th style="text-align:center">G%</th><th>Reyting</th></tr></thead><tbody>${bp.map(prow).join('')||'<tr><td colspan="4" class="muted">kayıt yok</td></tr>'}</tbody></table></div>
         </div>
       </div>
     </div>
@@ -2257,6 +2386,56 @@ async function renderSlot(slot,id){
   inp.onblur=()=>setTimeout(()=>res.classList.remove('show'),200);
 }
 
+function latestKlasman(d){const h=d.klasmanHistory||[];let best=null;for(const r of h){if(!best||r.year>best.year||(r.year===best.year&&r.week>best.week))best=r;}return best?best.puan:null;}
+function wlBar(w,l,col){const t=(w||0)+(l||0);const p=t?w/t*100:0;return `<div style="height:4px;border-radius:2px;background:var(--loss-soft);overflow:hidden;margin-top:3px"><i style="display:block;height:100%;width:${p}%;background:${col||'var(--win)'}"></i></div>`;}
+function cmpBar(va,vb,inv){let pa=va+vb?va/(va+vb)*100:50;if(inv)pa=va+vb?vb/(va+vb)*100:50;return `<div class="bar"><i class="ia" style="width:${pa}%"></i><i class="ib" style="width:${100-pa}%"></i></div>`;}
+function cmpStatRow(label,va,vb,inv){const na=parseFloat(va)||0,nb=parseFloat(vb)||0;const hiA=inv?na<nb:na>nb,hiB=inv?nb<na:nb>na;return `<div class="cmp cmp-row"><div class="lbl">${label}</div><div class="va ${hiA?'win-hi':'win-lo'}">${va}</div>${cmpBar(na,nb,inv)}<div class="vb ${hiB?'win-hi':'win-lo'}">${vb}</div></div>`;}
+function grp(title,rows){return `<div class="cmp-grp"><div style="font-family:var(--font-mono);font-size:10.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent-ink);margin-bottom:2px;padding-bottom:7px;border-bottom:2px solid var(--line)">${title}</div>${rows}</div>`;}
+function setLine(m){return m.sets&&m.sets.length?m.sets.map(s=>`<span class="sc-ic">${s.w==null?'-':s.w}-${s.l==null?'-':s.l}${s.tw!=null||s.tl!=null?`<sup>${s.tw==null?0:s.tw}-${s.tl==null?0:s.tl}</sup>`:''}</span>`).join(''):esc(m.score||'');}
+function cmpLeadBand(aVal,bVal,evenVal,anm,bnm){
+  const a=aVal||0,b=bVal||0,e=evenVal||0;
+  return `<div style="max-width:680px;margin:0 auto 14px">
+    <div style="display:flex;height:24px;border-radius:6px;overflow:hidden;font-size:11px;font-weight:700;color:#fff;background:var(--panel2)">
+      ${a?`<div title="${anm} üstün" style="flex:${a};background:#3b82f6;display:flex;align-items:center;justify-content:center">${a}</div>`:''}
+      ${e?`<div title="başa baş" style="flex:${e};background:var(--gold);display:flex;align-items:center;justify-content:center">${e}</div>`:''}
+      ${b?`<div title="${bnm} üstün" style="flex:${b};background:#f97316;display:flex;align-items:center;justify-content:center">${b}</div>`:''}
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--dim);margin-top:4px">
+      <span style="color:#3b82f6;font-weight:700">${anm} ▸ ${a}</span><span>başa baş ${e}</span><span style="color:#f97316;font-weight:700">${b} ◂ ${bnm}</span>
+    </div>
+  </div>`;}
+function cmpFormBand(d,n){const ms=(d.recentMatches||[]).slice(0,n||12).reverse();if(!ms.length)return'<span class="muted tag">—</span>';
+  return `<div style="display:flex;gap:3px">${ms.map(m=>{const wo=m.resultType==='walkover',ret=m.resultType==='retirement';
+    return `<span title="${esc(m.opponentName||'')} · ${esc(m.date||'')}" style="flex:1;height:18px;border-radius:3px;background:${m.won?'var(--win)':'var(--loss)'};opacity:${wo?.3:ret?.5:1}"></span>`;}).join('')}</div>`;}
+function cmpHasKlasman(da,db){return (da.klasmanHistory&&da.klasmanHistory.length)||(db.klasmanHistory&&db.klasmanHistory.length);}
+function cmpKlasSeries(d){const h=d.klasmanHistory||[];const by={};const rank={KLASMAN_14:2,KLASMAN_12:1};
+  for(const r of h){const k=r.year*100+r.week,rk=rank[r.type]||0;if(!(k in by)||rk>by[k].rk)by[k]={x:k,y:r.puan,rk};}
+  return Object.values(by).sort((a,b)=>a.x-b.x).map(p=>({x:p.x,y:p.y}));}
+async function drawCompareChart(da,db,aName,bName,metric){
+  metric=metric||'elo';
+  const wrap=document.getElementById('cmpChartWrap'); if(!wrap) return;
+  const dk=s=>{const m=/(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{4})/.exec(s||'');return m?(+m[3])*1e4+(+m[2])*100+(+m[1]):0;};
+  const eloSer=h=>(h||[]).map(r=>({x:dk(r.match_date),y:r.rating_after})).filter(p=>p.x);
+  let sa,sb,xdiv,yround;
+  if(metric==='klasman'){ sa=cmpKlasSeries(da); sb=cmpKlasSeries(db); xdiv=100; yround=false; }
+  else { sa=eloSer(da.ratingHistory); sb=eloSer(db.ratingHistory); xdiv=1e4; yround=true; }
+  if(sa.length<2&&sb.length<2){const ex0=window.Chart&&window.Chart.getChart('cmpChart');if(ex0)ex0.destroy();wrap.innerHTML='<p class="muted" style="text-align:center;padding:20px">'+(metric==='klasman'?'Klasman puanı verisi yok.':'Reyting geçmişi yok.')+'</p>';return;}
+  if(wrap.querySelector('canvas')==null) wrap.innerHTML='<canvas id="cmpChart"></canvas>';
+  if(!window.Chart){await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});}
+  const isDark=document.documentElement.getAttribute('data-theme')==='dark';
+  const ex=window.Chart.getChart('cmpChart'); if(ex) ex.destroy();
+  const unit=metric==='klasman'?' puan':'';
+  new window.Chart(document.getElementById('cmpChart'),{type:'line',
+    data:{datasets:[
+      {label:aName.split(' ')[0],data:sa,borderColor:'#3b82f6',borderWidth:2,pointRadius:0,tension:.3,fill:false,spanGaps:true},
+      {label:bName.split(' ')[0],data:sb,borderColor:'#f97316',borderWidth:2,pointRadius:0,tension:.3,fill:false,spanGaps:true}]},
+    options:{responsive:true,maintainAspectRatio:false,parsing:false,interaction:{mode:'nearest',intersect:false},
+      plugins:{legend:{labels:{color:'var(--dim)',font:{size:11},boxWidth:14}},
+        tooltip:{callbacks:{title:c=>Math.floor(c[0].parsed.x/xdiv)+'',label:c=>`${c.dataset.label}: ${yround?Math.round(c.parsed.y):c.parsed.y}${unit}`}}},
+      scales:{x:{type:'linear',grid:{color:isDark?'rgba(255,255,255,.06)':'rgba(0,0,0,.06)'},ticks:{color:'var(--dim)',font:{size:11},maxRotation:0,callback:v=>Math.floor(v/xdiv)}},
+        y:{grid:{color:isDark?'rgba(255,255,255,.06)':'rgba(0,0,0,.06)'},ticks:{color:'var(--dim)',font:{size:11}}}},
+      animation:{duration:500}}});
+}
 async function renderCompare(a,b){
   const [da,db,hh,cm]=await Promise.all([pinfo(a),pinfo(b),api(`/h2h/${a}/${b}`),api(`/common/${a}/${b}`)]);
   const ra=da.rating||{}, rb=db.rating||{};
@@ -2264,39 +2443,68 @@ async function renderCompare(a,b){
   const clubB=db.player||{}, clubBId=clubB.club_id, clubBName=clubB.club_name||rb.club_name||'';
   const aName=ra.name||(da.player&&da.player.name)||('#'+a);
   const bName2=rb.name||(db.player&&db.player.name)||('#'+b);
+  const byA=clubA.birth_year, byB=clubB.birth_year;
+  const kpA=latestKlasman(da), kpB=latestKlasman(db);
   const pct=r=>r.wins+r.losses?Math.round(r.wins/(r.wins+r.losses)*100):0;
-  const bar=(va,vb,inv)=>{ // inv: lower better (rank)
-    let pa=va+vb?va/(va+vb)*100:50; if(inv) pa=va+vb?vb/(va+vb)*100:50;
-    return `<div class="bar"><i class="ia" style="width:${pa}%"></i><i class="ib" style="width:${100-pa}%"></i></div>`;};
-  const row=(label,va,vb,inv)=>{
-    const na=parseFloat(va)||0, nb=parseFloat(vb)||0;
-    const hiA=inv?na<nb:na>nb, hiB=inv?nb<na:nb>na;
-    return `<div class="cmp">
-      <div class="lbl">${label}</div>
-      <div class="va ${hiA?'win-hi':'win-lo'}">${va}</div>${bar(na,nb,inv)}<div class="vb ${hiB?'win-hi':'win-lo'}">${vb}</div>
-      </div>`;};
-  const matches=hh.matches.map(m=>`<div class="matchline">
-      <span class="badge ${m.aWon?'W':'L'}">${m.aWon?esc(hh.a.name.split(' ')[0]):esc(hh.b.name.split(' ')[0])}</span>
-      <span class="score">${esc(m.score)}</span>
-      <span style="margin-left:auto" class="tag">${esc(m.event||'')} ${m.stage?'· '+esc(m.stage):''} · ${esc(m.date||'')}</span>
+  // "kim önde" — metric tally (inv: lower better)
+  const metr=[[ra.rating,rb.rating,0],[ra.peak_rating,rb.peak_rating,0],[ra.overall_rank,rb.overall_rank,1],
+    [pct(ra),pct(rb),0],[ra.wins,rb.wins,0],[ra.matches,rb.matches,0],[kpA,kpB,0]];
+  let aLead=0,bLead=0;
+  for(const [va,vb,inv] of metr){ if(va==null||vb==null||va===vb)continue; const aw=inv?va<vb:va>vb; if(aw)aLead++;else bLead++; }
+  const bar=cmpBar, row=cmpStatRow;
+  const dkM=s=>{const x=/(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{4})/.exec(s||'');return x?(+x[3])*1e4+(+x[2])*100+(+x[1]):0;};
+  const anF=esc(hh.a.name.split(' ')[0]), bnF=esc(hh.b.name.split(' ')[0]);
+  const matches=[...hh.matches].sort((x,y)=>dkM(y.date)-dkM(x.date)).map(m=>`<div style="padding:9px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span class="badge" style="background:${m.aWon?'#3b82f6':'#f97316'};color:#fff;flex-shrink:0">${m.aWon?anF:bnF}</span>
+      <span style="display:flex;gap:5px;flex-shrink:0">${setLine(m)}</span>
+      <span style="margin-left:auto;display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end" class="tag">
+        ${m.ageGroup?`<span class="pill age">${m.ageGroup} Yaş</span>`:''}${m.stage?esc(m.stage):''}
+        ${m.tournamentId?`· <a href="#/tournament/${m.tournamentId}">${esc(m.tournamentName||'turnuva')}</a>`:''} · ${esc(m.date||'')}</span>
     </div>`).join('')||'<p class="muted" style="text-align:center">Hiç karşılaşmamışlar.</p>';
+  const ctx=(name,club,by,rt)=>`<div class="tag" style="margin-top:3px;line-height:1.45">${esc(club||'')}${club&&by?' · ':''}${by?by+' doğ.':''}${(club||by)&&rt!=null?' · ':''}${rt!=null?'Elo '+Math.round(rt):''}</div>`;
+  const leadTxt=aLead>bLead?`<b style="color:#3b82f6">${esc(aName.split(' ')[0])}</b> ${aLead} metrikte önde`:bLead>aLead?`<b style="color:#f97316">${esc(bName2.split(' ')[0])}</b> ${bLead} metrikte önde`:`başa baş (${aLead}–${bLead})`;
   $('#cmpOut').innerHTML=`
     <div class="vs">
-      <div class="n"><a href="#/player/${a}" style="color:inherit">${esc(ra.name||da.player&&da.player.name||'#'+a)}</a></div>
+      <div class="n"><a href="#/player/${a}" style="color:inherit">${esc(aName)}</a>${ctx(aName,clubAName,byA,ra.rating)}</div>
       <div class="vsmid"><span class="c">${hh.a.wins}</span><span class="vsdash">–</span><span class="c vslo">${hh.b.wins}</span></div>
-      <div class="n vsb"><a href="#/player/${b}" style="color:inherit">${esc(rb.name||db.player&&db.player.name||'#'+b)}</a></div>
+      <div class="n vsb"><a href="#/player/${b}" style="color:inherit">${esc(bName2)}</a>${ctx(bName2,clubBName,byB,rb.rating)}</div>
     </div>
-    <p class="sub" style="text-align:center;margin-top:0">${hh.total} karşılaşma</p>
+    <p class="sub" style="text-align:center;margin-top:0">${hh.total} karşılaşma · ${leadTxt}</p>
     <div class="card" style="margin-bottom:16px">
       <div style="max-width:640px;margin:0 auto">
-        ${row('Elo Reyting',Math.round(ra.rating||0),Math.round(rb.rating||0))}
-        ${row('Zirve Elo',Math.round(ra.peak_rating||0),Math.round(rb.peak_rating||0))}
-        ${row('Genel Sıra',ra.overall_rank?'#'+ra.overall_rank:'—',rb.overall_rank?'#'+rb.overall_rank:'—',true)}
-        ${row('Kazanma %',pct(ra)+'%',pct(rb)+'%')}
-        ${row('Galibiyet',ra.wins||0,rb.wins||0)}
-        ${row('Toplam Maç',ra.matches||0,rb.matches||0)}
-        <div class="cmp"><div class="va muted">${ra.age_group?ra.age_group+' Yaş':'—'}</div><div class="lbl" style="grid-column:2;margin:0">Yaş Grubu</div><div class="vb muted">${rb.age_group?rb.age_group+' Yaş':'—'}</div></div>
+        ${grp('Reyting & Puan',
+          row('Elo Reyting',Math.round(ra.rating||0),Math.round(rb.rating||0))+
+          row('Zirve Elo',Math.round(ra.peak_rating||0),Math.round(rb.peak_rating||0))+
+          (kpA!=null||kpB!=null?row('Klasman Puanı',kpA!=null?kpA:'—',kpB!=null?kpB:'—'):''))}
+        ${grp('Sıralamalar',
+          row('Genel Sıra',ra.overall_rank?'#'+ra.overall_rank:'—',rb.overall_rank?'#'+rb.overall_rank:'—',true)+
+          (ra.age_group_rank||rb.age_group_rank?row('Yaş Grubu Sıra',ra.age_group_rank?'#'+ra.age_group_rank:'—',rb.age_group_rank?'#'+rb.age_group_rank:'—',true):'')+
+          (ra.gender_rank||rb.gender_rank?row('Cinsiyet Sıra',ra.gender_rank?'#'+ra.gender_rank:'—',rb.gender_rank?'#'+rb.gender_rank:'—',true):''))}
+        ${grp('Maç Performansı',
+          row('Toplam Maç',ra.matches||0,rb.matches||0)+
+          row('Galibiyet',ra.wins||0,rb.wins||0)+
+          row('Kazanma %',pct(ra)+'%',pct(rb)+'%'))}
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-top:1px solid var(--line)">
+          <span style="font-size:13px;font-weight:600;color:var(--txt2);white-space:nowrap">${ra.age_group?ra.age_group+' Yaş':'—'}${byA?' · '+byA:''}</span>
+          <span style="font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.07em;font-weight:600;flex-shrink:0">Yaş / Doğum</span>
+          <span style="font-size:13px;font-weight:600;color:var(--txt2);white-space:nowrap;text-align:right">${rb.age_group?rb.age_group+' Yaş':'—'}${byB?' · '+byB:''}</span>
+        </div>
       </div>
+    </div>
+    <div class="card" style="margin-bottom:16px">
+      <div style="max-width:640px;margin:0 auto">
+        <div class="cmp" style="align-items:center"><div class="va" style="min-width:0">${cmpFormBand(da)}</div><div class="lbl" style="grid-column:2;margin:0">Son Form</div><div class="vb" style="min-width:0">${cmpFormBand(db)}</div></div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px">
+        <div style="font-weight:600" id="cmpChartTitle">Elo Geçmişi</div>
+        <div style="display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden">
+          <button type="button" id="cmEloBtn" style="padding:5px 12px;border:none;cursor:pointer;font-weight:700;font-size:12px">Elo</button>
+          <button type="button" id="cmKlasBtn" style="padding:5px 12px;border:none;cursor:pointer;font-weight:700;font-size:12px">Klasman</button>
+        </div>
+      </div>
+      <div id="cmpChartWrap" style="height:240px;position:relative"><canvas id="cmpChart"></canvas></div>
     </div>
     <div class="card" style="margin-bottom:16px;padding:0">
       <details>
@@ -2306,6 +2514,17 @@ async function renderCompare(a,b){
     </div>
     <div class="card" style="margin-bottom:16px;padding:0">${commonSection(cm,a,b)}</div>
     <div id="clubOppSection"><p class="muted" style="text-align:center">yükleniyor…</p></div>`;
+  (()=>{
+    const hasK=cmpHasKlasman(da,db);
+    const eloB=document.getElementById('cmEloBtn'), klasB=document.getElementById('cmKlasBtn'), title=document.getElementById('cmpChartTitle');
+    const on='background:var(--accent-soft);color:var(--accent-ink)', off='background:var(--panel);color:var(--txt2)';
+    const base='padding:5px 12px;border:none;cursor:pointer;font-weight:700;font-size:12px;';
+    const set=metric=>{eloB.style.cssText=base+(metric==='elo'?on:off);klasB.style.cssText=base+(metric==='klasman'?on:off);title.textContent=metric==='klasman'?'Klasman Puanı Geçmişi':'Elo Geçmişi';drawCompareChart(da,db,aName,bName2,metric);};
+    if(!hasK){klasB.style.cssText=base+off+';opacity:.4;cursor:not-allowed';klasB.disabled=true;}
+    else klasB.onclick=()=>set('klasman');
+    eloB.onclick=()=>set('elo');
+    set('elo');
+  })();
   if(!clubAId&&!clubBId){document.getElementById('clubOppSection').outerHTML='';return;}
   const fetches=[];
   if(clubAId) fetches.push(api('/club_opponents'+qs({player:b,club_id:clubAId})).then(co=>({co,player:bName2,club:clubAName,clubOwner:aName,linkId:a})));
@@ -2335,11 +2554,12 @@ function commonSection(cm,a,b){
     const aCol=c.aW>c.aL?'var(--win)':c.aL>c.aW?'var(--loss)':'var(--gold)';
     const bCol=c.bW>c.bL?'var(--win)':c.bL>c.bW?'var(--loss)':'var(--gold)';
     const rowBg=ar>br?'var(--win-soft)':br>ar?'var(--loss-soft)':'rgba(176,125,18,.12)';
+    const supPill=ar>br?`<span class="pill" style="background:#3b82f6;border-color:#3b82f6;color:#fff">◀<span class="sup-nm"> ${an}</span><span class="sup-init"> ${an.slice(0,1)}</span></span>`:br>ar?`<span class="pill" style="background:#f97316;border-color:#f97316;color:#fff"><span class="sup-nm">${bn} </span><span class="sup-init">${bn.slice(0,1)} </span>▶</span>`:`<span class="pill" style="background:var(--gold);border-color:var(--gold);color:#fff">=</span>`;
     const main=`<tr style="cursor:pointer;background:${rowBg}" onclick="(function(e){var d=document.getElementById('cd${i}');d.style.display=d.style.display==='none'?'table-row':'none';})()">
       <td><span class="tag">▸</span> <a href="#/player/${c.opponentId}" onclick="event.stopPropagation()">${esc(c.name)}</a></td>
-      <td style="text-align:center;font-weight:700;color:${aCol}">${c.aW}-${c.aL}</td>
-      <td style="text-align:center;font-weight:700;color:${bCol}">${c.bW}-${c.bL}</td>
-      <td style="text-align:center">${ar>br?'◀ '+an:br>ar?bn+' ▶':'='}</td></tr>`;
+      <td style="text-align:center;font-weight:700;color:${aCol};min-width:54px">${c.aW}-${c.aL}${wlBar(c.aW,c.aL,'#3b82f6')}</td>
+      <td style="text-align:center;font-weight:700;color:${bCol};min-width:54px">${c.bW}-${c.bL}${wlBar(c.bW,c.bL,'#f97316')}</td>
+      <td style="text-align:center">${supPill}</td></tr>`;
     const detail=`<tr id="cd${i}" style="display:none"><td colspan="4" style="background:var(--panel2)">
       <div class="row" style="gap:24px">
         <div class="col"><div class="tag" style="margin-bottom:4px"><b class="win-hi">${an}</b> · ${esc(c.name)}</div>${mlines(c.aMatches)}</div>
@@ -2351,6 +2571,16 @@ function commonSection(cm,a,b){
       <summary style="list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;user-select:none;padding:16px 22px"><span style="font-weight:600">Ortak Rakipler (${cm.commonCount})</span> <span class="toggle-arrow">▾</span></summary>
       <div style="padding:0 22px 20px">
         <p class="sub" style="text-align:center">${verdict} <span class="tag">· satıra tıkla maçları gör</span></p>
+        <div style="max-width:680px;margin:0 auto 14px">
+          <div style="display:flex;height:24px;border-radius:6px;overflow:hidden;font-size:11px;font-weight:700;color:#fff">
+            ${cm.aBetter?`<div title="${an} üstün" style="flex:${cm.aBetter};background:#3b82f6;display:flex;align-items:center;justify-content:center">${cm.aBetter}</div>`:''}
+            ${cm.even?`<div title="başa baş" style="flex:${cm.even};background:var(--gold);display:flex;align-items:center;justify-content:center">${cm.even}</div>`:''}
+            ${cm.bBetter?`<div title="${bn} üstün" style="flex:${cm.bBetter};background:#f97316;display:flex;align-items:center;justify-content:center">${cm.bBetter}</div>`:''}
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--dim);margin-top:4px">
+            <span style="color:#3b82f6;font-weight:700">${an} ▸ ${cm.aBetter}</span><span>başa baş ${cm.even}</span><span style="color:#f97316;font-weight:700">${cm.bBetter} ◂ ${bn}</span>
+          </div>
+        </div>
         <div class="cmp" style="max-width:680px;margin:0 auto 6px">
           ${(()=>{const va=`${aw.w}-${aw.l}`,vb=`${bw.w}-${bw.l}`,hiA=ap>bp,hiB=bp>ap;
             return `<div class="va ${hiA?'win-hi':'win-lo'}">${va}</div><div class="lbl" style="grid-column:2;margin:0">Ortaklara Karşı</div><div class="vb ${hiB?'win-hi':'win-lo'}">${vb}</div>
@@ -2378,7 +2608,7 @@ function clubOpponentsSection(co,bName,clubName,aId,clubOwnerName){
     const scoreCol=o.w>o.l?'var(--win)':o.l>o.w?'var(--loss)':'var(--gold)';
     const main=`<tr style="cursor:pointer;background:${rowBg}" onclick="(function(){var d=document.getElementById('${uid}');d.style.display=d.style.display==='none'?'table-row':'none';})()">
       <td><span class="tag">▸</span> <a href="#/player/${o.oppId}" onclick="event.stopPropagation()">${esc(o.oppName)}</a></td>
-      <td style="text-align:center;font-weight:700;color:${scoreCol}">${o.w}-${o.l}</td>
+      <td style="text-align:center;font-weight:700;color:${scoreCol};min-width:54px">${o.w}-${o.l}${wlBar(o.w,o.l)}</td>
       <td style="text-align:center">${o.w+o.l} maç</td></tr>`;
     const detail=`<tr id="${uid}" style="display:none"><td colspan="3" style="background:var(--panel2)">
       <div style="padding:8px 4px">${mlines(o.matches)}</div></td></tr>`;
@@ -2390,6 +2620,13 @@ function clubOpponentsSection(co,bName,clubName,aId,clubOwnerName){
       <summary style="list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;user-select:none;padding:16px 22px"><span style="font-weight:600">${title} (${total})</span> <span class="toggle-arrow">▾</span></summary>
       <div style="padding:0 22px 20px">
         <p class="sub" style="text-align:center"><b>${bn}</b>'un <a href="#/player/${aId}" style="color:inherit">${esc(clubName)}</a> kulübü oyuncularına karşı ${total} maç · ${wins} galibiyet <span class="tag">· satıra tıkla detay</span></p>
+        <div style="max-width:300px;margin:0 auto 14px">
+          <div style="display:flex;height:22px;border-radius:6px;overflow:hidden;font-size:11px;font-weight:700;color:#fff;background:var(--loss)">
+            ${wins?`<div style="flex:${wins};background:var(--win);display:flex;align-items:center;justify-content:center">${wins}G</div>`:''}
+            ${total-wins?`<div style="flex:${total-wins};display:flex;align-items:center;justify-content:center">${total-wins}M</div>`:''}
+          </div>
+          <div style="text-align:center;font-size:11px;color:var(--dim);margin-top:4px">${total?Math.round(wins/total*100):0}% galibiyet oranı</div>
+        </div>
         <div style="max-width:680px;margin:0 auto">
           <table><thead><tr><th>Rakip</th><th style="text-align:center">${bn}</th><th style="text-align:center">Toplam</th></tr></thead>
           <tbody>${rows}</tbody></table>
@@ -2431,7 +2668,7 @@ async function route(){
     if(parts[0]==='players') return players_dir(parseQ(query));
     if(parts[0]==='tournaments') return tournaments(parseQ(query));
     if(parts[0]==='tournament') return tournament(parts[1]);
-    if(parts[0]==='clubs') return clubs();
+    if(parts[0]==='clubs') return clubs(parseQ(query));
     if(parts[0]==='club') return clubDetail(parts[1]);
     app().innerHTML='<p class="muted">Sayfa yok.</p>';
   }catch(e){app().innerHTML='<p class="muted">Hata: '+esc(e.message)+'</p>';}

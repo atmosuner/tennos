@@ -78,7 +78,8 @@ CREATE TABLE clubs (
     phone    TEXT,
     web      TEXT,
     contact  TEXT,
-    source   TEXT
+    source   TEXT,
+    abbrev   TEXT
 );
 
 CREATE TABLE players (
@@ -187,7 +188,7 @@ def derive_event(event: str) -> tuple[int | None, str | None]:
 def insert_clubs(cur: sqlite3.Cursor) -> int:
     clubs = load_json(OUTPUTS / "clubs.json", {"clubs": []})["clubs"]
     cur.executemany(
-        "INSERT OR REPLACE INTO clubs VALUES (:club_id,:name,:city,:address,:email,:phone,:web,:contact,:source)",
+        "INSERT OR REPLACE INTO clubs VALUES (:club_id,:name,:city,:address,:email,:phone,:web,:contact,:source,:abbrev)",
         [
             {
                 "club_id": c["clubId"],
@@ -199,11 +200,35 @@ def insert_clubs(cur: sqlite3.Cursor) -> int:
                 "web": c.get("web"),
                 "contact": c.get("contact"),
                 "source": c.get("source", "kulupler-list"),
+                "abbrev": None,
             }
             for c in clubs
         ],
     )
     return len(clubs)
+
+
+def populate_club_abbrev(cur: sqlite3.Cursor, unique_map: dict[str, int]) -> int:
+    """Fill clubs.abbrev: trusted unique abbrev first, else the most common
+    non-FERDI abbrev seen in match_players for that club."""
+    for abbrev, club_id in unique_map.items():
+        cur.execute("UPDATE clubs SET abbrev=? WHERE club_id=? AND abbrev IS NULL", (abbrev, club_id))
+    rows = cur.execute(
+        """
+        SELECT club_id, club_abbrev, count(*) c FROM match_players
+        WHERE club_id IS NOT NULL AND club_abbrev IS NOT NULL AND club_abbrev<>'' AND club_abbrev<>'FERDI'
+        GROUP BY club_id, club_abbrev
+        """
+    ).fetchall()
+    best: dict[int, tuple[str, int]] = {}
+    for club_id, abbrev, c in rows:
+        if club_id not in best or c > best[club_id][1]:
+            best[club_id] = (abbrev, c)
+    cur.executemany(
+        "UPDATE clubs SET abbrev=? WHERE club_id=? AND abbrev IS NULL",
+        [(abbrev, club_id) for club_id, (abbrev, _) in best.items()],
+    )
+    return cur.execute("SELECT count(*) FROM clubs WHERE abbrev IS NOT NULL").fetchone()[0]
 
 
 def insert_players(cur: sqlite3.Cursor) -> int:
@@ -383,13 +408,14 @@ def main() -> int:
                     n_sets += 1
 
     n_backfilled_players = backfill_missing_players(cur)
+    n_club_abbrev = populate_club_abbrev(cur, unique_map)
 
     cur.executescript(INDEXES)
     conn.commit()
     conn.close()
 
     print(f"db={args.db}")
-    print(f"clubs={n_clubs} players={n_players} (+{n_backfilled_players} backfilled from match data) tournaments={n_tournaments} groups={n_groups}")
+    print(f"clubs={n_clubs} (+{n_club_abbrev} with abbrev) players={n_players} (+{n_backfilled_players} backfilled from match data) tournaments={n_tournaments} groups={n_groups}")
     print(f"matches={n_matches} match_players={n_match_players} sets={n_sets}")
     return 0
 

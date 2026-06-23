@@ -90,6 +90,23 @@ def build_set_cols(conn: sqlite3.Connection, match_id: str, player_is_first: boo
     return out
 
 
+def build_set_score(conn: sqlite3.Connection, match_id: str, first_is_winner: bool) -> str:
+    """Set count from the winner's perspective, e.g. '2-1'."""
+    sets = conn.execute(
+        "SELECT p1_games, p2_games FROM sets WHERE match_id=? ORDER BY set_number", (match_id,)
+    ).fetchall()
+    w = l = 0
+    for s in sets:
+        wg, lg = (s["p1_games"], s["p2_games"]) if first_is_winner else (s["p2_games"], s["p1_games"])
+        if wg is None and lg is None:
+            continue
+        if (wg or 0) > (lg or 0):
+            w += 1
+        elif (lg or 0) > (wg or 0):
+            l += 1
+    return f"{w}-{l}" if (w + l) else ""
+
+
 def player_matches(conn: sqlite3.Connection, player_id: int, limit: int | None = None) -> list[dict]:
     sql = """
         SELECT m.match_id, m.match_date, m.event, m.stage, m.result_type,
@@ -231,7 +248,7 @@ class Handler(BaseHTTPRequestHandler):
         return {
             "players": g("SELECT count(*) FROM players"),
             "ratedPlayers": g("SELECT count(*) FROM player_ratings"),
-            "activeRatedPlayers": g(f"SELECT count(*) FROM player_ratings WHERE {af}", (cutoff,)),
+            "activeRatedPlayers": g("SELECT count(*) FROM player_ratings"),
             "clubs": g("SELECT count(*) FROM clubs"),
             "tournaments": g("SELECT count(*) FROM tournaments"),
             "matches": g("SELECT count(*) FROM matches"),
@@ -273,8 +290,8 @@ class Handler(BaseHTTPRequestHandler):
             ),
         }
         rise = one(
-            f"""WITH h AS (SELECT player_id,rating_after,SUBSTR(match_date,7,4)||SUBSTR(match_date,4,2)||SUBSTR(match_date,1,2) dk
-                    FROM player_rating_history WHERE SUBSTR(match_date,7,4)||SUBSTR(match_date,4,2)||SUBSTR(match_date,1,2)>='{acs}'),
+            """WITH h AS (SELECT player_id,rating_after,SUBSTR(match_date,7,4)||SUBSTR(match_date,4,2)||SUBSTR(match_date,1,2) dk
+                    FROM player_rating_history),
                 strt AS (SELECT player_id,count(*) c,MIN(dk) mindk FROM h GROUP BY player_id)
                 SELECT pr.player_id,pr.name,CAST(round(pr.rating-(SELECT rating_after FROM h WHERE h.player_id=strt.player_id AND h.dk=strt.mindk LIMIT 1)) AS INTEGER) v
                 FROM strt JOIN player_ratings pr ON pr.player_id=strt.player_id WHERE strt.c>=5 ORDER BY v DESC LIMIT 1"""
@@ -292,7 +309,7 @@ class Handler(BaseHTTPRequestHandler):
                ORDER BY gap DESC LIMIT 6"""
         )
         cohorts = many(f"SELECT birth_year,round(avg(rating)) avg,count(*) n FROM player_ratings WHERE birth_year IS NOT NULL AND matches>=5 AND {af()} GROUP BY birth_year HAVING n>=20 ORDER BY birth_year DESC LIMIT 8")
-        cities = many(f"SELECT p.city,count(*) n FROM player_ratings pr JOIN players p ON p.player_id=pr.player_id WHERE p.city<>'' AND p.city IS NOT NULL AND {af('pr.')} GROUP BY p.city ORDER BY n DESC LIMIT 10")
+        cities = many("SELECT p.city,count(*) n FROM player_ratings pr JOIN players p ON p.player_id=pr.player_id WHERE p.city<>'' AND p.city IS NOT NULL GROUP BY p.city ORDER BY n DESC LIMIT 10")
         return {"season": season, "records": records, "topClubs": top_clubs, "youngTalents": young_talents, "upsets": upsets, "cohorts": cohorts, "cities": cities}
 
     def api_rankings(self, conn, q):
@@ -300,14 +317,16 @@ class Handler(BaseHTTPRequestHandler):
         if q.get("age_group"):
             where.append("pr.age_group=?"); params.append(int(q["age_group"]))
         if q.get("club_id"):
-            where.append("pr.club_id=?"); params.append(int(q["club_id"]))
+            where.append("p.club_id=?"); params.append(int(q["club_id"]))
         if q.get("gender"):
-            where.append("pr.gender=?"); params.append(q["gender"])
+            where.append("p.gender=?"); params.append(q["gender"])
         if q.get("birth_year"):
-            where.append("pr.birth_year=?"); params.append(int(q["birth_year"]))
+            where.append("p.birth_year=?"); params.append(int(q["birth_year"]))
+        if q.get("city"):
+            where.append("p.city=?"); params.append(q["city"])
         if q.get("q"):
-            where.append(f"{foldsql('pr.name')} LIKE ?"); params.append(f"%{fold(q['q'])}%")
-        if not q.get("all_time"):
+            where.append(f"{foldsql('p.name')} LIKE ?"); params.append(f"%{fold(q['q'])}%")
+        if q.get("active_only"):
             from datetime import date, timedelta
             cutoff = (date.today() - timedelta(days=183)).strftime("%Y%m%d")
             where.append(f"SUBSTR(pr.last_match_date,7,4)||SUBSTR(pr.last_match_date,4,2)||SUBSTR(pr.last_match_date,1,2)>='{cutoff}'")
@@ -323,13 +342,17 @@ class Handler(BaseHTTPRequestHandler):
             order_col = "pr.overall_rank"
         ag = int(q["age_group"]) if q.get("age_group") else None
         ag_sel = (
-            f",(SELECT count(*) FROM matches WHERE winner_id=pr.player_id AND age_group={ag} AND result_type='completed') ag_wins"
-            f",(SELECT count(*) FROM matches WHERE loser_id=pr.player_id AND age_group={ag} AND result_type='completed') ag_losses"
+            f",(SELECT count(*) FROM matches WHERE winner_id=p.player_id AND age_group={ag} AND result_type='completed') ag_wins"
+            f",(SELECT count(*) FROM matches WHERE loser_id=p.player_id AND age_group={ag} AND result_type='completed') ag_losses"
         ) if ag else ""
         sql = f"""
-            SELECT pr.*, p.gender, p.city AS player_city{ag_sel}
-            FROM player_ratings pr LEFT JOIN players p ON p.player_id=pr.player_id
-            WHERE {' AND '.join(where)} ORDER BY {order_col} LIMIT ? OFFSET ?
+            SELECT p.player_id, p.name, p.birth_year, p.gender, p.club_id, p.club_name, p.city AS player_city, cl.abbrev AS club_abbrev,
+                   pr.rating, pr.peak_rating, pr.matches, pr.wins, pr.losses, pr.age_group,
+                   pr.first_match_date, pr.last_match_date, pr.overall_rank, pr.gender_rank, pr.age_group_rank,
+                   (SELECT puan FROM klasman_puan WHERE player_id=p.player_id ORDER BY year DESC,week DESC,type DESC LIMIT 1) kp{ag_sel}
+            FROM players p LEFT JOIN player_ratings pr ON pr.player_id=p.player_id
+            LEFT JOIN clubs cl ON cl.club_id=p.club_id
+            WHERE {' AND '.join(where)} ORDER BY ({order_col} IS NULL),{order_col},p.name LIMIT ? OFFSET ?
         """
         rows = rows_to_dicts(conn.execute(sql, (*params, limit, offset)).fetchall())
         if ag:
@@ -337,10 +360,10 @@ class Handler(BaseHTTPRequestHandler):
                 r["wins"] = r.pop("ag_wins", r["wins"])
                 r["losses"] = r.pop("ag_losses", r["losses"])
         total = conn.execute(
-            f"SELECT count(*) FROM player_ratings pr LEFT JOIN players p ON p.player_id=pr.player_id WHERE {' AND '.join(where)}",
+            f"SELECT count(*) FROM players p LEFT JOIN player_ratings pr ON pr.player_id=p.player_id WHERE {' AND '.join(where)}",
             params,
         ).fetchone()[0]
-        years = [r[0] for r in conn.execute("SELECT DISTINCT birth_year FROM player_ratings WHERE birth_year IS NOT NULL ORDER BY birth_year").fetchall()]
+        years = [r[0] for r in conn.execute("SELECT DISTINCT birth_year FROM players WHERE birth_year IS NOT NULL ORDER BY birth_year").fetchall()]
         return {"total": total, "limit": limit, "offset": offset, "years": years, "rankings": rows}
 
     def api_player(self, conn, pid):
@@ -378,7 +401,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def api_h2h(self, conn, a, b):
         rows = conn.execute(
-            """SELECT m.match_id, m.match_date, m.event, m.stage, m.winner_id, m.loser_id, m.p1_id,
+            """SELECT m.match_id, m.match_date, m.event, m.stage, m.age_group, m.winner_id, m.loser_id, m.p1_id,
                       m.tournament_id, t.name AS tname
                FROM matches m LEFT JOIN tournaments t ON t.tournament_id=m.tournament_id
                WHERE m.result_type='completed'
@@ -391,10 +414,11 @@ class Handler(BaseHTTPRequestHandler):
         out = []
         for r in rows:
             out.append({
-                "date": r["match_date"], "event": r["event"], "stage": r["stage"],
+                "date": r["match_date"], "event": r["event"], "stage": r["stage"], "ageGroup": r["age_group"],
                 "winnerId": r["winner_id"], "aWon": r["winner_id"] == a,
                 "tournamentId": r["tournament_id"], "tournamentName": r["tname"],
                 "score": build_score(conn, r["match_id"], player_is_first=(r["p1_id"] == a)),
+                "sets": build_set_cols(conn, r["match_id"], player_is_first=(r["p1_id"] == r["winner_id"])),
             })
         return {
             "a": {"playerId": a, "name": na["name"] if na else f"#{a}", "wins": wins_a},
@@ -525,18 +549,21 @@ class Handler(BaseHTTPRequestHandler):
             where.append("EXISTS(SELECT 1 FROM matches mx WHERE mx.tournament_id=t.tournament_id AND mx.age_group=?)"); params.append(int(q["age_group"]))
         limit = min(int(q.get("limit", 700)), 700)
         mc_sql = "(SELECT count(*) FROM matches m WHERE m.tournament_id=t.tournament_id AND m.winner_id IS NOT NULL AND m.loser_id IS NOT NULL)"
+        pc_sql = "(SELECT count(*) FROM (SELECT winner_id v FROM matches WHERE tournament_id=t.tournament_id AND winner_id IS NOT NULL UNION SELECT loser_id FROM matches WHERE tournament_id=t.tournament_id AND loser_id IS NOT NULL))"
+        dord = "SUBSTR(REPLACE(t.start_date,' ',''),7,4)||SUBSTR(REPLACE(t.start_date,' ',''),4,2)||SUBSTR(REPLACE(t.start_date,' ',''),1,2)"
+        order = f"{mc_sql} DESC, {dord} DESC, t.tournament_id DESC" if q.get("sort") == "size" else f"{dord} DESC, t.tournament_id DESC"
         sql = f"""
-            SELECT t.tournament_id, t.name, t.city, t.start_date, t.year, t.type_text, t.surface, t.court_type,
-                   t.source_tab, c.name AS club_name, {mc_sql} AS match_count
+            SELECT t.tournament_id, t.name, t.title, t.city, t.start_date, t.year, t.type_text, t.surface, t.court_type,
+                   t.source_tab, c.name AS club_name, {mc_sql} AS match_count, {pc_sql} AS player_count
             FROM tournaments t LEFT JOIN clubs c ON c.club_id=t.club_id
             WHERE {' AND '.join(where)} AND ({mc_sql}>0 OR t.source_tab='guncel')
-            ORDER BY SUBSTR(REPLACE(t.start_date,' ',''),7,4)||SUBSTR(REPLACE(t.start_date,' ',''),4,2)||SUBSTR(REPLACE(t.start_date,' ',''),1,2) DESC,
-                t.tournament_id DESC LIMIT ?
+            ORDER BY {order} LIMIT ?
         """
         rows = rows_to_dicts(conn.execute(sql, (*params, limit)).fetchall())
         years = [r[0] for r in conn.execute("SELECT DISTINCT year FROM tournaments WHERE year IS NOT NULL ORDER BY year DESC").fetchall()]
         age_groups = [r[0] for r in conn.execute("SELECT DISTINCT age_group FROM matches WHERE age_group IS NOT NULL ORDER BY age_group").fetchall()]
-        return {"total": len(rows), "years": years, "age_groups": age_groups, "tournaments": rows}
+        cities = [r[0] for r in conn.execute("SELECT DISTINCT city FROM tournaments WHERE city IS NOT NULL AND city<>'' ORDER BY city").fetchall()]
+        return {"total": len(rows), "years": years, "age_groups": age_groups, "cities": cities, "tournaments": rows}
 
     def api_tournament(self, conn, tid):
         t = conn.execute("SELECT * FROM tournaments WHERE tournament_id=?", (tid,)).fetchone()
@@ -549,13 +576,15 @@ class Handler(BaseHTTPRequestHandler):
                FROM matches WHERE tournament_id=? AND event<>'' GROUP BY event ORDER BY n DESC""",
             (tid,),
         ).fetchall())
-        # champion per event = winner of a Final-stage match
-        champs = {}
+        # champion per event = winner of a Final-stage match; finalist = its loser
+        champs, finals = {}, {}
         for r in conn.execute(
-            "SELECT event, winner_id FROM matches WHERE tournament_id=? AND stage LIKE '%Final%' AND winner_id IS NOT NULL",
+            "SELECT event, winner_id, loser_id FROM matches WHERE tournament_id=? AND stage LIKE '%Final%' AND winner_id IS NOT NULL",
             (tid,),
         ).fetchall():
-            champs.setdefault(r["event"], r["winner_id"])
+            if r["event"] not in champs:
+                champs[r["event"]] = r["winner_id"]
+                finals[r["event"]] = r["loser_id"]
         # matches
         mrows = conn.execute(
             """SELECT match_id, event, stage, gender, day_name, match_date, court, start_time, match_code, result_type,
@@ -565,29 +594,48 @@ class Handler(BaseHTTPRequestHandler):
         ids = set()
         for r in mrows:
             ids.update([r["winner_id"], r["loser_id"]])
-        ids |= set(champs.values())
+        ids |= set(champs.values()) | set(finals.values())
         names = {}
         for pid in ids:
             if pid is None:
                 continue
             row = conn.execute("SELECT name FROM players WHERE player_id=?", (pid,)).fetchone()
             names[pid] = row["name"] if row else f"#{pid}"
+
+        def rating_at(pid, dk):
+            if pid is None or not dk:
+                return None
+            row = conn.execute(
+                "SELECT rating_after FROM player_rating_history WHERE player_id=? "
+                "AND SUBSTR(match_date,7,4)||SUBSTR(match_date,4,2)||SUBSTR(match_date,1,2)<? "
+                "ORDER BY SUBSTR(match_date,7,4)||SUBSTR(match_date,4,2)||SUBSTR(match_date,1,2) DESC, rowid DESC LIMIT 1",
+                (pid, dk),
+            ).fetchone()
+            return round(row["rating_after"]) if row else None
+
         matches = []
         for r in mrows:
             if r["winner_id"] is None or r["loser_id"] is None:
                 continue
+            d = r["match_date"] or ""
+            dk = (d[6:10] + d[3:5] + d[0:2]) if len(d) >= 10 else ""
             matches.append({
                 "event": r["event"], "stage": r["stage"], "gender": r["gender"], "dayName": r["day_name"],
                 "date": r["match_date"], "court": r["court"], "startTime": r["start_time"], "matchCode": r["match_code"],
+                "resultType": r["result_type"],
                 "winnerId": r["winner_id"], "winnerName": names.get(r["winner_id"]),
                 "loserId": r["loser_id"], "loserName": names.get(r["loser_id"]),
+                "winnerRating": rating_at(r["winner_id"], dk), "loserRating": rating_at(r["loser_id"], dk),
                 "score": build_score(conn, r["match_id"], player_is_first=(r["p1_id"] == r["winner_id"])),
                 "sets": build_set_cols(conn, r["match_id"], player_is_first=(r["p1_id"] == r["winner_id"])),
             })
         for c in cats:
             cid = champs.get(c["event"])
+            fid = finals.get(c["event"])
             c["championId"] = cid
             c["championName"] = names.get(cid) if cid else None
+            c["finalistId"] = fid
+            c["finalistName"] = names.get(fid) if fid else None
         return {"tournament": dict(t), "club": dict(club) if club else None,
                 "categories": cats, "matches": matches}
 
@@ -595,9 +643,18 @@ class Handler(BaseHTTPRequestHandler):
         where, params = ["1=1"], []
         if q.get("q"):
             where.append(f"{foldsql('c.name')} LIKE ?"); params.append(f"%{fold(q['q'])}%")
+        if q.get("city"):
+            where.append("c.city=?"); params.append(q["city"])
         limit = min(int(q.get("limit", 100)), 600)
+        order_map = {
+            "elo": "pr.avg_rating IS NULL, pr.avg_rating DESC",
+            "pct": "((coalesce(total_wins,0)+coalesce(total_losses,0))>=20) DESC, coalesce(total_wins,0)*1.0/nullif(coalesce(total_wins,0)+coalesce(total_losses,0),0) DESC",
+            "rated": "rated_count DESC",
+            "players": "player_count DESC",
+        }
+        order = order_map.get(q.get("sort"), order_map["players"])
         sql = f"""
-            SELECT c.club_id, c.name, c.city,
+            SELECT c.club_id, c.name, c.abbrev, c.city,
                    coalesce(pc.n, 0) AS player_count,
                    coalesce(pr.rated_count, 0) AS rated_count,
                    coalesce(pr.total_wins, 0) AS total_wins,
@@ -607,13 +664,14 @@ class Handler(BaseHTTPRequestHandler):
             LEFT JOIN (SELECT club_id, count(*) n FROM players GROUP BY club_id) pc ON pc.club_id=c.club_id
             LEFT JOIN (SELECT club_id, count(*) rated_count, sum(wins) total_wins, sum(losses) total_losses, round(avg(rating)) avg_rating FROM player_ratings GROUP BY club_id) pr ON pr.club_id=c.club_id
             WHERE {' AND '.join(where)}
-            ORDER BY player_count DESC LIMIT ?
+            ORDER BY {order} LIMIT ?
         """
-        return {"clubs": rows_to_dicts(conn.execute(sql, (*params, limit)).fetchall())}
+        cities = [r[0] for r in conn.execute("SELECT DISTINCT city FROM clubs WHERE city IS NOT NULL AND city<>'' ORDER BY city").fetchall()]
+        return {"clubs": rows_to_dicts(conn.execute(sql, (*params, limit)).fetchall()), "cities": cities}
 
     def api_club(self, conn, club_id):
         c = conn.execute("""
-            SELECT c.club_id, c.name, c.city,
+            SELECT c.club_id, c.name, c.abbrev, c.city,
                    coalesce(pc.n, 0) AS player_count,
                    coalesce(pr.rated_count, 0) AS rated_count,
                    coalesce(pr.total_wins, 0) AS total_wins,
@@ -625,6 +683,8 @@ class Handler(BaseHTTPRequestHandler):
             WHERE c.club_id=?""", (club_id,)).fetchone()
         if not c:
             return {"error": "not found"}
+        c = dict(c)
+        c["tournament_count"] = conn.execute("SELECT count(*) FROM tournaments WHERE club_id=?", (club_id,)).fetchone()[0]
         from datetime import date, timedelta
         cutoff = (date.today() - timedelta(days=183)).strftime("%Y%m%d")
         players = rows_to_dicts(conn.execute("""
@@ -783,6 +843,11 @@ class Handler(BaseHTTPRequestHandler):
                 by_gender[g]["aWins"] += 1
             else:
                 by_gender[g]["bWins"] += 1
+        for r in rows:
+            first_is_winner = r["winner_id"] == r["p1_id"]
+            r["score"] = build_set_score(conn, r["match_id"], first_is_winner)
+            r["fullScore"] = build_score(conn, r["match_id"], player_is_first=first_is_winner)
+            r["sets"] = build_set_cols(conn, r["match_id"], player_is_first=first_is_winner)
         return {"matches": rows, "aWins": a_wins, "bWins": b_wins, "total": len(rows), "byGender": by_gender}
 
     def api_search(self, conn, q):
