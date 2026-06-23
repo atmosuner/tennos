@@ -124,8 +124,8 @@
   .theme-btn--mobile{display:none}
   .pal-cycle{display:none;align-items:center;justify-content:center;background:var(--panel2);
     border:1px solid var(--line);border-radius:10px;cursor:pointer;padding:0}
-  .pal-cycle .dot{width:14px;height:14px;border-radius:50%;background:var(--accent);
-    box-shadow:0 0 0 2px var(--accent-soft);transition:background .2s}
+  .pal-cycle svg{width:22px;height:22px;display:block}
+  .pal-btn svg,.pal-seg button svg{width:15px;height:15px;display:block;flex-shrink:0}
   .search{position:relative;margin-left:auto;width:340px;max-width:46vw}
   .search-toggle{display:none}
   .search input{width:100%;background:var(--panel);border:1px solid var(--line);color:var(--txt);
@@ -377,11 +377,25 @@
 <script>
 function toggleTheme(){var dark=document.documentElement.getAttribute('data-theme')==='dark';var n=dark?'light':'dark';document.documentElement.setAttribute('data-theme',n);try{localStorage.setItem('tennos-theme',n);}catch(e){}syncThemeBtn();}
 function syncThemeBtn(){var dark=document.documentElement.getAttribute('data-theme')==='dark';var lbl=document.getElementById('themeLbl');if(lbl)lbl.textContent=dark?'Açık tema':'Koyu tema';['themeIcon','themeIcon2'].forEach(function(id){var e=document.getElementById(id);if(e)e.textContent=dark?'☀':'☾';});}
-var PAL_ORDER=['clay','grass','hard'],PAL_NAMES={clay:'Toprak',grass:'Çim',hard:'Sert'};
+var PAL_ORDER=['clay','grass','hard'];
+// Each court surface = its Grand Slam. Stylized emblems (not the official logos):
+// clay -> Roland-Garros (tennis ball), grass -> Wimbledon (crossed rackets),
+// hard -> US Open (flame swirl). Each emblem keeps its slam colour so cycling
+// reads orange -> green -> blue.
+var PAL_META={
+  clay:{name:'Roland-Garros',surface:'Toprak',emb:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#c2592c"/><path d="M4.6 7.4C8.2 9.4 8.2 14.6 4.6 16.6" fill="none" stroke="#fbe9df" stroke-width="1.7" stroke-linecap="round"/><path d="M19.4 7.4C15.8 9.4 15.8 14.6 19.4 16.6" fill="none" stroke="#fbe9df" stroke-width="1.7" stroke-linecap="round"/></svg>'},
+  grass:{name:'Wimbledon',surface:'Çim',emb:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#1f8a3b"/><g fill="none" stroke="#eafaee" stroke-width="1.5" stroke-linecap="round"><ellipse cx="9.2" cy="10" rx="2.6" ry="3.2" transform="rotate(-28 9.2 10)"/><ellipse cx="14.8" cy="10" rx="2.6" ry="3.2" transform="rotate(28 14.8 10)"/><path d="M10.5 13.2 8 17.6"/><path d="M13.5 13.2 16 17.6"/></g></svg>'},
+  hard:{name:'US Open',surface:'Sert',emb:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#2f6fd0"/><path d="M8.5 16.5c-1.4-2.8.2-5.2 2.4-6.3 2.1-1.1 1.7-3 .7-4.2 3.2.9 5.4 3.7 4.3 6.8-.9 2.5-3.6 3.8-6 3" fill="none" stroke="#e6f0fd" stroke-width="1.7" stroke-linecap="round"/></svg>'},
+};
 function setPalette(p){document.documentElement.setAttribute('data-palette',p);try{localStorage.setItem('tennos-palette',p);}catch(e){}syncPalBtns();}
 function cyclePalette(){var cur=document.documentElement.getAttribute('data-palette')||'clay';setPalette(PAL_ORDER[(PAL_ORDER.indexOf(cur)+1)%PAL_ORDER.length]);}
-function syncPalBtns(){var cur=document.documentElement.getAttribute('data-palette')||'clay';document.querySelectorAll('.pal-btn,.pal-seg button').forEach(function(b){b.classList.toggle('active',b.dataset.pal===cur);});var pc=document.getElementById('palCycle');if(pc)pc.title=PAL_NAMES[cur]+' — değiştir';}
+function paintPalEmblems(){
+  document.querySelectorAll('.pal-btn[data-pal]').forEach(function(b){var m=PAL_META[b.dataset.pal];if(m){b.innerHTML=m.emb+'<span>'+m.surface+'</span>';b.title=m.name;}});
+  document.querySelectorAll('.pal-seg button[data-pal]').forEach(function(b){var m=PAL_META[b.dataset.pal];if(m){b.innerHTML=m.emb;b.title=m.name+' ('+m.surface+')';}});
+}
+function syncPalBtns(){var cur=document.documentElement.getAttribute('data-palette')||'clay';document.querySelectorAll('.pal-btn,.pal-seg button').forEach(function(b){b.classList.toggle('active',b.dataset.pal===cur);});var pc=document.getElementById('palCycle');if(pc){var m=PAL_META[cur];pc.innerHTML=m.emb;pc.title=m.name+' — zemini değiştir';}}
 syncThemeBtn();
+paintPalEmblems();
 syncPalBtns();
 </script>
 
