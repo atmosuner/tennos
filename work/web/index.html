@@ -220,7 +220,7 @@
   .vs{display:flex;align-items:center;justify-content:center;gap:24px;margin:0 0 16px;background:var(--score-bg);
     border-radius:var(--radius);padding:26px 24px;position:relative;overflow:hidden}
   .vs::after{content:"";position:absolute;left:50%;top:20px;bottom:20px;width:1px;background:var(--score-line);transform:translateX(-50%)}
-  .vs .n{font-family:var(--font-disp);font-size:20px;font-weight:700;letter-spacing:-.02em;color:#e8e6df;flex:1;text-align:right;position:relative}
+  .vs .n{font-family:var(--font-disp);font-size:20px;font-weight:700;letter-spacing:-.02em;color:#e8e6df;flex:1;min-width:0;overflow-wrap:anywhere;text-align:right;position:relative}
   .vs .n.vsb{text-align:left}
   .vs .vsmid{display:flex;align-items:baseline;gap:8px;position:relative}
   .vs .c{font-family:var(--font-mono);font-size:46px;font-weight:700;color:var(--score-ink);
@@ -281,14 +281,16 @@
     .sidebar .brand,.side-foot{display:none}
     #nav{flex-direction:row;width:100%;justify-content:space-between;gap:2px;overflow-x:auto}
     #nav::-webkit-scrollbar{display:none}
-    #nav a{flex:1 0 auto;flex-direction:column;gap:2px;align-items:center;text-align:center;
-      font-size:11px;font-weight:700;padding:7px 8px;white-space:nowrap;border-radius:9px}
+    #nav a{flex:1 0 auto;flex-direction:column;gap:2px;align-items:center;justify-content:center;
+      text-align:center;font-size:11px;font-weight:700;padding:10px 8px;min-height:44px;
+      white-space:nowrap;border-radius:9px}
     #nav a.active::before{display:none}
     .main-col{margin-left:0}
     .topbar{padding:11px 16px}
     .brand--mobile{display:flex;margin:0;font-size:20px}
     .theme-btn--mobile{display:flex;width:auto;padding:9px 11px;font-size:15px}
     .search{display:none}
+    .pal-seg{display:none}
     .search.open{display:block;position:absolute;left:10px;right:10px;top:8px;width:auto;margin:0;max-width:none;z-index:45}
     .search-toggle{display:inline-flex;align-items:center;justify-content:center;min-width:42px;height:38px;margin-left:auto;
       background:var(--panel2);border:1px solid var(--line);color:var(--txt2);border-radius:10px;cursor:pointer;font-size:16px}
