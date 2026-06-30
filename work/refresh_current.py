@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import gzip
 import json
+import os
 import re
 import shutil
 import sqlite3
@@ -34,6 +35,8 @@ FILTERED_JSON = OUTPUTS / "filtered_yas_tournaments.json"
 DB_PATH = OUTPUTS / "tennos.db"
 WEB_DB = WORK / "web" / "tennos-web.db"
 WEB_DB_GZ = WORK / "web" / "tennos-web.db.gz"
+WEB_DETAIL_DB = WORK / "web" / "tennos-web-detail.db"
+WEB_DETAIL_DB_GZ = WORK / "web" / "tennos-web-detail.db.gz"
 
 TAB_KEYS = {
     "guncelturnuvalar": "guncel",
@@ -230,7 +233,8 @@ def run(cmd: list[str], dry_run: bool) -> bool:
     print(f"  $ {' '.join(cmd)}")
     if dry_run:
         return True
-    result = subprocess.run(cmd, cwd=PROJECT_ROOT)
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+    result = subprocess.run(cmd, cwd=PROJECT_ROOT, env=env)
     return result.returncode == 0
 
 
@@ -313,11 +317,11 @@ def main() -> int:
 
     # 5. Re-scrape güncel tournaments
     print(f"\n[scrape] {len(guncel_yas)} turnuva --refresh --force")
-    ok = run(
-        [sys.executable, str(WORK / "scrape_tournament_details.py"),
-         "--only-id", ids, "--refresh", "--force"],
-        args.dry_run,
-    )
+    scrape_cmd = [sys.executable, str(WORK / "scrape_tournament_details.py"),
+                  "--only-id", ids, "--refresh", "--force"]
+    if args.no_ssl_verify:
+        scrape_cmd.append("--no-ssl-verify")
+    ok = run(scrape_cmd, args.dry_run)
     if not ok:
         print("scrape başarısız", file=sys.stderr)
         return 1
@@ -340,15 +344,21 @@ def main() -> int:
         print("\n[gzip]")
         if not args.dry_run:
             _gzip_file(WEB_DB, WEB_DB_GZ)
+            if WEB_DETAIL_DB.exists():
+                _gzip_file(WEB_DETAIL_DB, WEB_DETAIL_DB_GZ)
         else:
             print(f"  gzip {WEB_DB} -> {WEB_DB_GZ}")
+            print(f"  gzip {WEB_DETAIL_DB} -> {WEB_DETAIL_DB_GZ}")
     else:
         print("\n[gzip atlandı — --no-gzip]")
 
     if not args.dry_run and WEB_DB_GZ.exists():
         mb = WEB_DB_GZ.stat().st_size / 1e6
         print(f"\ntennos-web.db.gz güncellendi ({mb:.1f} MB)")
-        print("git add work/web/tennos-web.db.gz && git commit && git push")
+        if WEB_DETAIL_DB_GZ.exists():
+            mb2 = WEB_DETAIL_DB_GZ.stat().st_size / 1e6
+            print(f"tennos-web-detail.db.gz güncellendi ({mb2:.1f} MB)")
+        print("git add work/web/tennos-web.db.gz work/web/tennos-web-detail.db.gz && git commit && git push")
 
     print("\ndone")
     return 0

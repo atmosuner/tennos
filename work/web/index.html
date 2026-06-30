@@ -973,18 +973,6 @@ async function home(){
     </div>`).join('')}
     </div>
   </div>`;
-  // --- Rakamlarla sezon ---
-  const sn=ins.season;
-  const seasonChip=(v,l)=>`<div style="flex:1;min-width:120px"><div style="font-family:var(--font-mono);font-size:22px;font-weight:700;color:var(--score-ink);line-height:1">${v}</div><div style="color:#9aa0aa;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-top:5px">${l}</div></div>`;
-  const season=`<div class="hide-mobile" style="background:var(--score-bg);border-radius:var(--radius);padding:20px 24px;margin-bottom:8px">
-    <div style="font-family:var(--font-mono);font-size:10.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#7c8089;margin-bottom:14px">RAKAMLARLA ${esc(sn.year)} SEZONU</div>
-    <div style="display:flex;gap:18px;flex-wrap:wrap">
-      ${seasonChip(sn.completed.toLocaleString('tr'),'Skorlu Maç')}
-      ${seasonChip(sn.tournaments.toLocaleString('tr'),'Turnuva')}
-      ${seasonChip(sn.busiestMonth,'En Yoğun Ay')}
-      ${seasonChip(sn.topCategory,'En Kalabalık Kategori')}
-    </div>
-  </div>`;
   app().innerHTML=`
     <div style="position:relative;margin-bottom:6px;padding-bottom:18px;border-bottom:1px solid var(--line)">
       <div style="font-family:var(--font-mono);font-size:11.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--accent-ink)">İ-KORT · 8–14 YAŞ · CANLI ELO</div>
@@ -995,7 +983,6 @@ async function home(){
       ${statCard(s.tournaments.toLocaleString('tr'),'Turnuva','#/tournaments')}
       ${statCard(s.clubs.toLocaleString('tr'),'Kulüp','#/clubs')}
     </div>
-    ${season}
     ${records}
     <div class="kx-grid2" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">${topClubs}${youngTalents}</div>
     <div class="kx-grid2" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">${upsets}${cohorts}</div>
