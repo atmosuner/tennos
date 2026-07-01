@@ -46,6 +46,11 @@ jobs:
             git push
           fi
 
+      - name: Trigger Pages deploy
+        run: gh workflow run deploy-pages.yml
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Upload updated outputs archive
         if: always()   # başarısız olsa da outputs'u güncelle (kısmi ilerlemeyi koru)
         run: |
