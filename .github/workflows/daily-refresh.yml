@@ -1,0 +1,55 @@
+name: Daily data refresh
+
+on:
+  schedule:
+    - cron: '0 3 * * *'   # 03:00 UTC her gün (Türkiye saati 06:00)
+  workflow_dispatch:       # elle de tetiklenebilir
+
+concurrency:
+  group: refresh-data
+  cancel-in-progress: false   # devam eden run bitmeden yeni başlatma
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download outputs archive
+        run: gh release download outputs-data --pattern "outputs.tar.gz" --dir .
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract outputs
+        run: tar -xzf outputs.tar.gz
+
+      - name: Refresh data
+        run: python3 work/refresh_current.py
+
+      - name: Commit web DBs
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add work/web/tennos-web.db.gz work/web/tennos-web-detail.db.gz
+          if git diff --cached --quiet; then
+            echo "web DB değişmedi, commit atlandı"
+          else
+            git commit -m "data: daily refresh $(date -u +%Y-%m-%d)"
+            git push
+          fi
+
+      - name: Upload updated outputs archive
+        if: always()   # başarısız olsa da outputs'u güncelle (kısmi ilerlemeyi koru)
+        run: |
+          tar -czf outputs.tar.gz outputs/
+          gh release upload outputs-data outputs.tar.gz --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
