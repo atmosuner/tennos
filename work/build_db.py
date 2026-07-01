@@ -348,7 +348,7 @@ def main() -> int:
 
     for path in sorted(DETAILS_DIR.glob("*.json")):
         try:
-            payload = json.loads(path.read_text(encoding="utf-8"))
+            payload = json.loads(path.read_text(encoding="utf-8", errors="replace"))
         except (json.JSONDecodeError, OSError):
             continue
 
