@@ -549,7 +549,7 @@ class Handler(BaseHTTPRequestHandler):
         if q.get("year"):
             where.append("t.year=?"); params.append(int(q["year"]))
         if q.get("age_group"):
-            where.append("EXISTS(SELECT 1 FROM matches mx WHERE mx.tournament_id=t.tournament_id AND mx.age_group=?)"); params.append(int(q["age_group"]))
+            where.append("t.age_group=?"); params.append(int(q["age_group"]))
         limit = min(int(q.get("limit", 700)), 700)
         dord = "SUBSTR(REPLACE(t.start_date,' ',''),7,4)||SUBSTR(REPLACE(t.start_date,' ',''),4,2)||SUBSTR(REPLACE(t.start_date,' ',''),1,2)"
         order = f"t.match_count DESC, {dord} DESC, t.tournament_id DESC" if q.get("sort") == "size" else f"{dord} DESC, t.tournament_id DESC"
@@ -562,7 +562,7 @@ class Handler(BaseHTTPRequestHandler):
         """
         rows = rows_to_dicts(conn.execute(sql, (*params, limit)).fetchall())
         years = [r[0] for r in conn.execute("SELECT DISTINCT year FROM tournaments WHERE year IS NOT NULL ORDER BY year DESC").fetchall()]
-        age_groups = [r[0] for r in conn.execute("SELECT DISTINCT age_group FROM matches WHERE age_group IS NOT NULL ORDER BY age_group").fetchall()]
+        age_groups = [r[0] for r in conn.execute("SELECT DISTINCT age_group FROM tournaments WHERE age_group IS NOT NULL ORDER BY age_group").fetchall()]
         cities = [r[0] for r in conn.execute("SELECT DISTINCT city FROM tournaments WHERE city IS NOT NULL AND city<>'' ORDER BY city").fetchall()]
         return {"total": len(rows), "years": years, "age_groups": age_groups, "cities": cities, "tournaments": rows}
 

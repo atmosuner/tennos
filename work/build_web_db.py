@@ -253,6 +253,18 @@ def main() -> int:
     if "raw_text" in cols:
         cur.execute("ALTER TABLE matches DROP COLUMN raw_text")
     strip_indexes(cur)
+    # Denormalize dominant age_group onto tournaments so the core DB can filter/list
+    # without touching the matches table (which only lives in the detail DB).
+    cols_t = [r[1] for r in cur.execute("PRAGMA table_info(tournaments)").fetchall()]
+    if "age_group" not in cols_t:
+        cur.execute("ALTER TABLE tournaments ADD COLUMN age_group INTEGER")
+    cur.execute("""
+        UPDATE tournaments SET age_group = (
+            SELECT age_group FROM matches
+            WHERE tournament_id = tournaments.tournament_id AND age_group IS NOT NULL
+            GROUP BY age_group ORDER BY count(*) DESC LIMIT 1
+        )
+    """)
     conn.commit()
     write_web_precomputed(conn)  # needs matches/player_rating_history, so before the core copy splits them off
     conn.commit()

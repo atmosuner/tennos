@@ -427,7 +427,7 @@ syncPalBtns();
   let DB=null, SQL=null, detailPromise=null;
   // Cache-bust on schema change: bump DB_SCHEMA_VER whenever the web DB columns/tables
   // change, so returning visitors re-download instead of running new SQL on an old DB.
-  const DB_SCHEMA_VER='2026-06-23-split';
+  const DB_SCHEMA_VER='2026-07-01-agecol';
   // build_web_db.py strips non-PK indexes from both shipped .db files to cut download
   // size (~35% smaller); rebuild them here so query performance matches the source DB.
   // Keep these lists in sync with build_web_db.py's index drop.
@@ -652,7 +652,7 @@ syncPalBtns();
       if(q.q){w.push('('+foldsql('t.name')+' LIKE ? OR '+foldsql('t.title')+' LIKE ?)');p.push('%'+fold(q.q)+'%','%'+fold(q.q)+'%');}
       if(q.city){w.push('t.city=?');p.push(q.city);}
       if(q.year){w.push('t.year=?');p.push(+q.year);}
-      if(q.age_group){w.push('EXISTS(SELECT 1 FROM matches mx WHERE mx.tournament_id=t.tournament_id AND mx.age_group=?)');p.push(+q.age_group);}
+      if(q.age_group){w.push('t.age_group=?');p.push(+q.age_group);}
       const lim=Math.min(+(q.limit||700),700),wc=w.join(' AND ');
       const dord=`SUBSTR(REPLACE(t.start_date,' ',''),7,4)||SUBSTR(REPLACE(t.start_date,' ',''),4,2)||SUBSTR(REPLACE(t.start_date,' ',''),1,2)`;
       const order=q.sort==='size'?`t.match_count DESC, ${dord} DESC, t.tournament_id DESC`:`${dord} DESC, t.tournament_id DESC`;
@@ -661,7 +661,7 @@ syncPalBtns();
         FROM tournaments t LEFT JOIN clubs c ON c.club_id=t.club_id WHERE ${wc} AND (t.match_count>0 OR t.source_tab='guncel')
         ORDER BY ${order} LIMIT ?`,[...p,lim]);
       const years=Q('SELECT DISTINCT year FROM tournaments WHERE year IS NOT NULL ORDER BY year DESC').map(r=>r.year);
-      const age_groups=Q('SELECT DISTINCT age_group FROM matches WHERE age_group IS NOT NULL ORDER BY age_group').map(r=>r.age_group);
+      const age_groups=Q('SELECT DISTINCT age_group FROM tournaments WHERE age_group IS NOT NULL ORDER BY age_group').map(r=>r.age_group);
       const cities=Q("SELECT DISTINCT city FROM tournaments WHERE city IS NOT NULL AND city<>'' ORDER BY city").map(r=>r.city);
       return {total:rows.length,years,age_groups,cities,tournaments:rows};
     },
