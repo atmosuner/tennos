@@ -11,7 +11,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 echo "=== outputs/ arşivleniyor ==="
-ARCHIVE=/tmp/outputs_upload.tar.gz
+ARCHIVE=/tmp/outputs.tar.gz
 tar -czf "$ARCHIVE" outputs/
 SIZE=$(du -sh "$ARCHIVE" | cut -f1)
 echo "Arşiv: $ARCHIVE ($SIZE)"
@@ -26,7 +26,7 @@ gh release view outputs-data >/dev/null 2>&1 && echo "Release zaten var, atlanı
 
 echo ""
 echo "=== outputs.tar.gz yükleniyor ($SIZE) ==="
-gh release upload outputs-data "$ARCHIVE" --name "outputs.tar.gz" --clobber
+gh release upload outputs-data "$ARCHIVE" --clobber
 
 echo ""
 echo "=== Bitti ==="
