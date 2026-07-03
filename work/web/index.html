@@ -132,6 +132,7 @@
     font-size:13px;width:100%}
   .theme-btn:hover{border-color:var(--accent);color:var(--txt)}
   .side-cred{color:var(--dim);font-size:11px;padding:0 4px;line-height:1.45}
+  .mob-update{display:none;font-size:11px;color:var(--dim);text-align:center;padding:3px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
 
   .main-col{flex:1;min-width:0;margin-left:var(--sbw);display:flex;flex-direction:column}
   .topbar{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:14px;padding:13px 32px;
@@ -349,6 +350,7 @@
     .picker .results{position:absolute;left:0;right:auto;top:54px;width:100%}
     .charts-row{grid-template-columns:1fr!important}
     .kx-grid2{grid-template-columns:1fr!important}
+    .mob-update{display:block}
   }
 </style>
 </head>
@@ -391,6 +393,7 @@
       </div>
       <button class="theme-btn theme-btn--mobile" type="button" onclick="toggleTheme()" aria-label="Tema değiştir"><span id="themeIcon2">☾</span></button>
     </header>
+    <div class="mob-update" id="mobUpdate"></div>
     <div id="cmpBar"><div class="cmp-bar-inner"></div></div>
     <main id="app"><div class="loading">yükleniyor…</div></main>
   </div>
@@ -2726,6 +2729,20 @@ async function route(){
 }
 window.addEventListener('hashchange',route);
 window.bootDB().then(route).catch(e=>{app().innerHTML='<p class="muted" style="padding:40px">Veri yüklenemedi: '+esc(e.message)+'</p>';});
+(function(){
+  var TR_M=['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
+  fetch('https://api.github.com/repos/atmosuner/tennos/actions/workflows/daily-refresh.yml/runs?status=success&per_page=1')
+    .then(function(r){return r.json();})
+    .then(function(d){
+      var run=(d.workflow_runs||[])[0]; if(!run) return;
+      var dt=new Date(run.updated_at);
+      var lbl='Son güncelleme: '+dt.getDate()+' '+TR_M[dt.getMonth()]+' '+dt.getFullYear();
+      var cred=document.querySelector('.side-cred');
+      if(cred) cred.innerHTML='İ-KORT 8–14 yaş turnuva verisi · Elo reyting · head-to-head<br><span style="opacity:.7">'+lbl+'</span>';
+      var mob=document.getElementById('mobUpdate');
+      if(mob) mob.textContent=lbl;
+    }).catch(function(){});
+})();
 </script>
 </body>
 </html>
