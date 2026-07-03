@@ -2731,16 +2731,25 @@ window.addEventListener('hashchange',route);
 window.bootDB().then(route).catch(e=>{app().innerHTML='<p class="muted" style="padding:40px">Veri yüklenemedi: '+esc(e.message)+'</p>';});
 (function(){
   var TR_M=['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
+  function applyLbl(lbl){
+    var cred=document.querySelector('.side-cred');
+    if(cred) cred.innerHTML='İ-KORT 8–14 yaş turnuva verisi · Elo reyting · head-to-head<br><span style="opacity:.7">'+lbl+'</span>';
+    var mob=document.getElementById('mobUpdate');
+    if(mob) mob.textContent=lbl;
+  }
+  var CACHE_KEY='tennos-last-refresh',TTL=24*60*60*1000;
+  try{
+    var cached=JSON.parse(localStorage.getItem(CACHE_KEY)||'null');
+    if(cached&&Date.now()-cached.ts<TTL){applyLbl(cached.lbl);return;}
+  }catch(e){}
   fetch('https://api.github.com/repos/atmosuner/tennos/actions/workflows/daily-refresh.yml/runs?status=success&per_page=1')
     .then(function(r){return r.json();})
     .then(function(d){
       var run=(d.workflow_runs||[])[0]; if(!run) return;
       var dt=new Date(run.updated_at);
       var lbl='Son güncelleme: '+dt.getDate()+' '+TR_M[dt.getMonth()]+' '+dt.getFullYear();
-      var cred=document.querySelector('.side-cred');
-      if(cred) cred.innerHTML='İ-KORT 8–14 yaş turnuva verisi · Elo reyting · head-to-head<br><span style="opacity:.7">'+lbl+'</span>';
-      var mob=document.getElementById('mobUpdate');
-      if(mob) mob.textContent=lbl;
+      try{localStorage.setItem(CACHE_KEY,JSON.stringify({lbl:lbl,ts:Date.now()}));}catch(e){}
+      applyLbl(lbl);
     }).catch(function(){});
 })();
 </script>
