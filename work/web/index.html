@@ -1026,7 +1026,7 @@ function rankTable(rows, rankField){
       return `<tr>
         <td class="rk-cmp" style="padding:0 4px"><button class="cmp-btn ${inSlot?'in-slot':''}" data-pid="${p.player_id}" data-name="${esc(p.name)}" onclick="addToCmp(this.dataset.pid,this.dataset.name)" title="Karşılaştırmaya ekle">${inSlot?'✓':'⇄'}</button></td>
         <td class="rank ${rk!=null&&rk<=3?'top':''}">${rk!=null?rk:'<span class="muted">—</span>'}</td>
-        <td><a href="#/player/${p.player_id}" class="rk-name"><span class="rk-name2">${esc(nf)}</span>${nl?`<span class="rk-name2">${esc(nl)}</span>`:''}<span class="rk-club-inline muted">${esc(abv)}</span></a>${undef}</td>
+        <td><a href="#/player/${p.player_id}" class="rk-name"><span class="rk-name2">${esc(nf)}</span>${nl?` <span class="rk-name2">${esc(nl)}</span>`:''}<span class="rk-club-inline muted">${esc(abv)}</span></a>${undef}</td>
         <td class="rk-dob muted" style="font-size:11px">${p.birth_year||'—'}</td>
         <td class="rk-cat" style="text-align:center"><div class="flex" style="justify-content:center">${ageGenderP(p.age_group,p.gender)}</div><div class="rk-cat-inline muted" style="font-size:.78em">${p.birth_year||''}</div></td>
         <td class="rating" style="text-align:center">${p.rating!=null?Math.round(p.rating):'<span class="muted">—</span>'}<div class="rk-pct-inline muted" style="font-size:.78em">${pct!=null?pct+'%':''}</div></td>
